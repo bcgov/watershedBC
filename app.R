@@ -5,11 +5,11 @@ library(tictoc)
 library(elevatr)
 
 library(bcmaps)
-library(bcdata)
 library(sf)
 library(DBI)
 library(RPostgreSQL)
 
+library(bcdata)
 library(terra)
 library(leaflet)
 library(tidyr)
@@ -29,29 +29,27 @@ library(pool)
 
 
 # CONNECT TO DB ####
-refresh <- function() {
-  dbPool(drv = RPostgres::dbDriver("PostgreSQL"),
-            dbname = Sys.getenv("aw_dbname"),
-            host = Sys.getenv("aw_host"),
-            port = Sys.getenv("aw_port"),
-            user = Sys.getenv("aw_user"),
-            password = Sys.getenv("aw_password"))
-}
 
-conn <- refresh()
+  refresh <- function() {
+    dbPool(drv = RPostgres::dbDriver("PostgreSQL"),
+              dbname = Sys.getenv("aw_dbname"),
+              host = Sys.getenv("aw_host"),
+              port = Sys.getenv("aw_port"),
+              user = Sys.getenv("aw_user"),
+              password = Sys.getenv("aw_password"))}
 
-# for(i in DBI::dbListConnections(RPostgres::dbDriver("PostgreSQL"))){
-#   DBI::dbDisconnect(i)
-# }
-#   pool::poolClose(conn)
+  # for(i in DBI::dbListConnections(RPostgres::dbDriver("PostgreSQL"))){
+  #   print(i)
+  #   DBI::dbDisconnect(i)
+  # }
+    # pool::poolClose(conn)
+
+  conn <- refresh()
 
 ## AOI ####
-aoi <- st_read(conn, "bc_bound")
-names <- st_read(conn, query = "SELECT * FROM fwa_named") %>%
-  mutate(name = paste0(gnis_name, " (id:",gnis_id,") ", round(area_m2/(1000*1000),0), "sq.km")) %>%
-  arrange(name)
-# st_join(names %>% st_centroid(), bcmaps::nr_districts() %>% select(DISTRICT_NAME) %>% mutate(DISTRICT_NAME = gsub(" Natural Resource District", "", DISTRICT_NAME))) %>%
-#   mutate(name = name)
+
+  aoi <- st_read(conn, "bc_bound")
+  names <- readRDS("named.RDS")
 
 ## SET BASE MAP ####
 initial_map <- leaflet() %>%
@@ -129,13 +127,12 @@ ui <- navbarPage(theme = "css/bcgov.css", title = "WatershedBC (testing)",
 
                             #### 1st COL ####
                             column(width = 2,
-
                                    HTML("<b>Get started:</b><br>"),
                                    HTML("1 - Click anywhere in BC to get started<br>
                                          2 - Click 'Run Report'<br>
-                                         3 - Be patient!"),
-                                   br(),br(),
-                                   shiny::selectInput(inputId = "psql_zoom_to_name", label = "Search by Name",
+                                         3 - Be patient!"), br(),br(),
+
+                                   shiny::selectizeInput(inputId = "psql_zoom_to_name", label = "Search by Name",
                                                       choices = c("",names$name),
                                                       selected = "", multiple = F),
                                    actionButton(inputId = "zoom_to_button", label = "Zoom to.."),
@@ -234,9 +231,7 @@ server <- function(input, output, session) {
     print(input$psql_zoom_to_name)
 
     split_name <- strsplit(strsplit(input$psql_zoom_to_name, "id:")[[1]][2], ")")[[1]][1]
-    print(split_name)
     split_name_id <- split_name[length(split_name)]
-    print(split_name_id)
     n <- st_read(conn, query = paste0("SELECT * FROM fwa_named WHERE gnis_id = ", split_name_id))
     print(n)
     new_ws(n %>%
@@ -312,7 +307,7 @@ server <- function(input, output, session) {
     {
 
     new_ws2 <- new_ws()
-    # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Bowron River'") %>% mutate(area_km2 = area_m2/(1000*1000))
+    # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Amanita Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
 
     if(new_ws2$area_km2 > 10000){
       output$ws_run <- renderText({"Watershed is too large... please select a smaller watershed"})
@@ -323,7 +318,7 @@ server <- function(input, output, session) {
       withProgress(message = 'Processing...', max = 10,  {
 
         # NAMED WATERSHEDS ####
-        incProgress(1, detail = paste0("Getting Watershed (",round(new_ws2$area_km2,1),")"))
+        incProgress(1, detail = paste0("Get watersheds (",round(new_ws2$area_km2,0),")"))
         print("getting watershed")
         my_named <- pg_clip("fwa_named", "*", "fwa_named", new_ws2$gnis_id) %>%
           mutate(area_km2 = area_m2/(1000*1000)) %>%
@@ -479,7 +474,7 @@ server <- function(input, output, session) {
               ggplot() +
               geom_col(aes(year,100*(cumsum/new_ws2$area_km2), fill = type)) +
               theme_bw() +
-              labs(x = "", y = "Percent of Watershed (%)", title = "Cumulative Disturbance History", fill = "") +
+              labs(x = "", y = "Percent of Watershed (%)", title = "Cumulative Forest Disturbance History", fill = "") +
               scale_fill_manual(values = c("darkgreen","orange")) +
               scale_y_continuous(n.breaks = 10) +
               scale_x_continuous(n.breaks = 10)
@@ -519,7 +514,7 @@ server <- function(input, output, session) {
         # GET NETWORK
                     my_stream_network <- bcdc_query_geodata("freshwater-atlas-stream-network") %>%
                       filter(INTERSECTS(new_ws2)) %>%
-                      filter(STREAM_ORDER > 2) %>%
+                      filter(STREAM_ORDER > 1) %>%
                       collect()
 
                     # CAST TO XYZ POINTS
@@ -643,6 +638,7 @@ server <- function(input, output, session) {
 
 
         # climate ####
+        incProgress(1, detail = "Get climate BC")
 
         climateBC <- terra::rast("/vsicurl/https://bcbasin.s3.ca-central-1.amazonaws.com/climateBC.tif",
                              win = terra::ext(new_ws2 %>% st_transform(4326)))
@@ -713,7 +709,7 @@ server <- function(input, output, session) {
         })
 
 
-        incProgress(1, detail = "Update map")
+        incProgress(1, detail = "Update Satellite Imagery")
         output$plot_landsat_1985 <- renderPlot({
           r1985 <- terra::rast("/vsicurl/https://bcbasin.s3.ca-central-1.amazonaws.com/1985_1990v3_COG_AV_JP_BIG.tif",
                                win = terra::ext(new_ws2 %>% st_transform(4326)))
