@@ -15,6 +15,7 @@ library(leaflet)
 library(tidyr)
 library(dplyr)
 library(shiny)
+library(stringr)
 
 library(sf)
 library(ggplot2)
@@ -46,9 +47,11 @@ conn <- refresh()
 
 ## AOI ####
 aoi <- st_read(conn, "bc_bound")
-names <- st_read(conn, query = "SELECT gnis_name, gnis_id FROM fwa_named") %>%
-  mutate(name = paste(gnis_name, gnis_id)) %>%
+names <- st_read(conn, query = "SELECT * FROM fwa_named") %>%
+  mutate(name = paste0(gnis_name, " (id:",gnis_id,") ", round(area_m2/(1000*1000),0), "sq.km")) %>%
   arrange(name)
+# st_join(names %>% st_centroid(), bcmaps::nr_districts() %>% select(DISTRICT_NAME) %>% mutate(DISTRICT_NAME = gsub(" Natural Resource District", "", DISTRICT_NAME))) %>%
+#   mutate(name = name)
 
 ## SET BASE MAP ####
 initial_map <- leaflet() %>%
@@ -167,6 +170,9 @@ ui <- navbarPage(theme = "css/bcgov.css", title = "WatershedBC (testing)",
                                    plotlyOutput("plot_elevbins"),
                                    plotlyOutput("plot_fwa"),
                                    plotlyOutput("plot_dra"),
+                                   plotlyOutput("plot_mat"),
+                                   plotlyOutput("plot_map"),
+                                   plotlyOutput("plot_cmd"),
                                    plotOutput("plot_landsat_1985", width = 800, height = 800),
                                    plotOutput("plot_landsat_2020", width = 800, height = 800),
                                    plotOutput("plot_sentinel_2023", width = 800, height = 800),
@@ -226,7 +232,8 @@ server <- function(input, output, session) {
   observeEvent(input$zoom_to_button, {
 
     print(input$psql_zoom_to_name)
-    split_name <- strsplit(input$psql_zoom_to_name, " ")[[1]]
+
+    split_name <- strsplit(strsplit(input$psql_zoom_to_name, "id:")[[1]][2], ")")[[1]][1]
     print(split_name)
     split_name_id <- split_name[length(split_name)]
     print(split_name_id)
@@ -408,7 +415,8 @@ server <- function(input, output, session) {
               labs(x = "", y = "Length km", title = "Total Road Length by Surface Type", fill = "") +
               # scale_fill_manual(values = c("darkgreen","orange")) +
               scale_y_continuous(n.breaks = 10) +
-              coord_flip(),
+              coord_flip()
+            ,
             dynamicTicks = T, width = 600, height = 300)
         })
 
@@ -606,7 +614,7 @@ server <- function(input, output, session) {
                                  ggplot() +
                                  geom_line(aes(dist_tot_m/1000, Z, color = name)) +
                                  theme_bw() +
-                                 labs(x = "KM", y = "m a.s.l.", color = "Name", title = "Stream Profile"),
+                                 labs(x = "Distance along stream km", y = "Elevation m a.s.l.", color = "Name", title = "Stream Profile"),
                                dynamicTicks = T, width = 600, height = 300
                                )
                       })
@@ -618,7 +626,7 @@ server <- function(input, output, session) {
         output$mymap <- renderLeaflet({
           initial_map %>%
             addPolygons(data = new_ws2 %>% st_transform(4326), fillOpacity = 0, weight = 2, color = "blue") %>%
-            # addPolylines(data = dra %>% st_transform(4326), group = "Roads", fillColor = "black", color = "black", weight = 1, fillOpacity = 1, label = dra$TRANSPORT_LINE_SURFACE_CODE_DESC) %>%
+            # addPolylines(data = dra %>% st_simplify(500, preserveTopology = T) %>% st_transform(4326), group = "Roads", fillColor = "black", color = "black", weight = 1, fillOpacity = 1, label = dra$TRANSPORT_LINE_SURFACE_CODE_DESC) %>%
             addPolygons(data = my_wl %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Wetland", fillColor = "green", color = "green", weight = 1, fillOpacity = 0.1, label = my_wl$waterbody_type) %>%
             addPolygons(data = my_lk %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Lake",  fillColor = "steelblue", color = "steelblue", weight = 1, fillOpacity = 1, label = my_lk$waterbody_type) %>%
             addPolygons(data = my_gl %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Glacier",  fillColor = "grey", color = "grey", weight = 1, fillOpacity = 0.1, label = my_gl$waterbody_type) %>%
@@ -633,6 +641,76 @@ server <- function(input, output, session) {
             fitBounds(bbbb$xmin[[1]], bbbb$ymin[[1]], bbbb$xmax[[1]], bbbb$ymax[[1]])
         })
 
+
+        # climate ####
+
+        climateBC <- terra::rast("/vsicurl/https://bcbasin.s3.ca-central-1.amazonaws.com/climateBC.tif",
+                             win = terra::ext(new_ws2 %>% st_transform(4326)))
+        climateBC_pts <- terra::spatSample(vect(new_ws2 %>% st_transform(4326)), method = "regular", size = 1000)
+        climateBC_pts <- terra::extract(climateBC, climateBC_pts)
+        climateBC_pts_dat <- climateBC_pts %>% as_tibble() %>%
+          pivot_longer(-ID) %>%
+          mutate(period = case_when(str_detect(name, "Normal_1961_1990") ~ "1961-1990",
+                                    str_detect(name, "Normal_1971_2000") ~ "1971-2000",
+                                    str_detect(name, "Normal_1981_2010") ~ "1981-2010",
+                                    str_detect(name, "Normal_1991_2020") ~ "1991-2020",
+                                    str_detect(name, "_2011-2040_") ~ "2011-2040",
+                                    str_detect(name, "_2041-2070_") ~ "2041-2070",
+                                    str_detect(name, "_2071-2100_") ~ "2071-2100",
+                                    TRUE ~ "Error"),
+                 parameter = case_when(str_detect(name, "_MAP_") ~ "Mean Annual Precipitation",
+                                    str_detect(name, "MAT") ~ "Mean Annual Temperature",
+                                    str_detect(name, "CMD") ~ "Cumulative Moisture Deficit",
+                                    TRUE ~ "Error"),
+                 model = case_when(str_detect(name, "Normal_") ~ "Historic",
+                                   str_detect(name, "13GCMs_") ~ "13_GCMs",
+                                   str_detect(name, "8GCMs_") ~ "8_GCMs",
+                                   TRUE ~ "Error"),
+                 ssp = case_when(str_detect(name, "_ssp126_") ~ "SSP126",
+                                 str_detect(name, "_ssp245_") ~ "SSP245",
+                                 str_detect(name, "_ssp370_") ~ "SSP370",
+                                 str_detect(name, "_ssp585_") ~ "SSP585",
+                                 TRUE ~ "Historic"))
+
+        output$plot_mat <- renderPlotly({
+          ggplotly(
+            climateBC_pts_dat %>%
+            filter(model %in% c("Historic","13_GCMs")) %>%
+            filter(parameter == "Mean Annual Temperature") %>%
+            ggplot() +
+            geom_boxplot(aes(period, value, fill = ssp)) +
+            theme_bw() +
+            labs(x = "Climate Normal Period", y = "Mean Annual Temperature")
+            ,
+            dynamicTicks = T, width = 600, height = 300) %>%
+            layout(boxmode = "group")
+          })
+        output$plot_map <- renderPlotly({
+          ggplotly(
+            climateBC_pts_dat %>%
+              filter(model %in% c("Historic","13_GCMs")) %>%
+              filter(parameter == "Mean Annual Precipitation") %>%
+              ggplot() +
+              geom_boxplot(aes(period, value, fill = ssp)) +
+              theme_bw() +
+              labs(x = "Climate Normal Period", y = "Mean Annual Precipitation")
+            ,
+            dynamicTicks = T, width = 600, height = 300) %>%
+            layout(boxmode = "group")
+        })
+        output$plot_cmd <- renderPlotly({
+          ggplotly(
+            climateBC_pts_dat %>%
+              filter(model %in% c("Historic","13_GCMs")) %>%
+              filter(parameter == "Cumulative Moisture Deficit") %>%
+              ggplot() +
+              geom_boxplot(aes(period, value, fill = ssp)) +
+              theme_bw() +
+              labs(x = "Climate Normal Period", y = "Cumulative Moisture Deficit")
+            ,
+            dynamicTicks = T, width = 600, height = 300) %>%
+            layout(boxmode = "group")
+        })
 
 
         incProgress(1, detail = "Update map")
