@@ -32,3 +32,7 @@ https://bcgov-env.shinyapps.io/watershedBC/
 ## Step 3: Remote Sensing Data 
 
 - Landsat and Sentinel-2 mosaics generated using Google Earth Engine
+
+## Step 4: Climate Data
+
+- Climate BC
