@@ -137,7 +137,6 @@ initial_map <- leaflet() %>%
                      "Landsat 1985-1990 (slow)"),
                    options = layersControlOptions(collapsed = T)) %>%
   hideGroup(c("Sentinel 2023 (slow)","Landsat 1985-1990 (slow)","Landsat 2020-2023 (slow)")) %>%
-  fitBounds(-139.01451,47.68300,-110.48408,59.99974) %>%
   addMouseCoordinates()
 
 
@@ -231,7 +230,7 @@ server <- function(input, output, session) {
   session_token <- session$token
 
   # BASEMAP
-  output$mymap <- renderLeaflet({initial_map})
+  output$mymap <- renderLeaflet({initial_map %>% fitBounds(-139.01451,47.68300,-110.48408,59.99974)})
 
   # CREATE REACTIVE VAL FOR WATERSHED
   new_ws <- reactiveVal()
@@ -260,7 +259,7 @@ server <- function(input, output, session) {
                WHERE ST_Intersects(geom, ST_Transform(ST_SetSRID(ST_MakePoint(",point$lng,",",point$lat,"), 4326),3005))
                ORDER BY area_m2 ASC LIMIT 1")) %>%
             mutate(area_km2 = area_m2 / (1000 * 1000)) %>%
-            rename(gnis_name = basin, gnis_id = id))}
+            rename(gnis_name = id, gnis_id = basin))}
 
       output$ws_selection <- renderText({paste0("You selected ", new_ws()$gnis_name," (",format(round(as.numeric(new_ws()$area_km2), 0), big.mark = ",") ," sq.km)")})
       output$ws_selection_pred_time <- renderText({paste0("Estimated time to run report ~ ",0.5 + round((new_ws()$area_km2 * 0.03) / 60, 1)," min")})
@@ -272,7 +271,9 @@ server <- function(input, output, session) {
           addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap"),
                            overlayGroups = c("Sentinel 2023 (slow)","Landsat 2020-2023 (slow)","Landsat 1985-1990 (slow)","Watershed"), options = layersControlOptions(collapsed = T)) %>%
           hideGroup(c("Sentinel 2023 (slow)","Landsat 1985-1990 (slow)","Landsat 2020-2023 (slow)")) %>%
-          fitBounds(bbbb$xmin[[1]], bbbb$ymin[[1]], bbbb$xmax[[1]], bbbb$ymax[[1]])})})
+          fitBounds(bbbb$xmin[[1]], bbbb$ymin[[1]], bbbb$xmax[[1]], bbbb$ymax[[1]])
+        })
+        })
 
     a <- toc()$callback_msg
     output$ws_run <- renderText({a})
