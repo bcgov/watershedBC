@@ -80,9 +80,9 @@ initial_map <- leaflet() %>%
 pg_clip <- function(to_clip = "fwa_named", to_clip_cols_to_keep = "gnis_name",
                     clip_to = "fwa_named", watershed_id = 22501){
 
+  tic()
   q <- paste0("SELECT
                  w.*,
-                 ST_Area(ST_Intersection(w.geom,n.geom)) AS clipped_area_m2,
                  ST_Intersection(w.geom,n.geom) AS geom
                FROM ",
               to_clip," w
@@ -95,9 +95,9 @@ pg_clip <- function(to_clip = "fwa_named", to_clip_cols_to_keep = "gnis_name",
 
   o <-  st_read(conn, query = q)
 
-
   if(nrow(o)>0){
-    o <- o %>% filter(st_geometry_type(.) %in% c("POLYGON","MULTIPOLYGON"))
+    o <- o %>% filter(st_geometry_type(.) %in% c("POLYGON","MULTIPOLYGON")) %>%
+      mutate(clipped_area_m2 = as.numeric(st_area(.)))
     o <- o %>% bind_cols(elevatr::get_aws_points(o %>% st_centroid())[[1]] %>% st_drop_geometry() %>% dplyr::select(elevation))
     o <- o  %>% st_buffer(1) %>% st_cast("POLYGON")
   }
@@ -190,10 +190,11 @@ ui <- navbarPage(theme = "css/bcgov.css", title = "WatershedBC (testing)",
 
     fluidRow(
       column(width = 12,
-      HTML("Known issues: Data is not accurate across provincial, territorial, national borders."), br(),
-      HTML("This tool is provided with no guarantees of reliability or accuracy, please scrutinize the results."), br(),
-      HTML("Data sources include: Freshwater Atlas of BC, Consolidated Cutblocks of BC, BC Wildfire Service Fire Perimeters, Landsat, and Sentinel-2"), br(),
-      HTML("Please contact alexandre.bevington@gov.bc.ca with any questions or comments about this tool."),
+             HTML("<b>Data sources:</b> Freshwater Atlas of BC, Consolidated Cutblocks of BC, BC Wildfire Service Fire Perimeters, Landsat, and Sentinel-2"), br(),
+             HTML("<b>Known issues:</b> Data is not accurate across provincial, territorial, national borders."), br(),
+             HTML("This tool is provided with <b>no guarantees of reliability or accuracy</b>, please scrutinize the results."), br(),
+             HTML("Please contact <i>alexandre.bevington@gov.bc.ca</i> with any questions or comments about this tool."), br(),
+             HTML("More info at: <a href='https://github.com/bcgov/watershedBC/'>https://github.com/bcgov/watershedBC/"),br(),
       )),
 
           fluidRow(
@@ -622,9 +623,9 @@ server <- function(input, output, session) {
           initial_map %>%
             addPolygons(data = new_ws2 %>% st_transform(4326), fillOpacity = 0, weight = 2, color = "blue") %>%
             # addPolylines(data = dra %>% st_simplify(500, preserveTopology = T) %>% st_transform(4326), group = "Roads", fillColor = "black", color = "black", weight = 1, fillOpacity = 1, label = dra$TRANSPORT_LINE_SURFACE_CODE_DESC) %>%
-            addPolygons(data = my_wl %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Wetland", fillColor = "green", color = "green", weight = 1, fillOpacity = 0.1, label = my_wl$waterbody_type) %>%
+            addPolygons(data = my_wl %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Wetland", fillColor = "pink", color = "pink", weight = 1, fillOpacity = 0.3, label = my_wl$waterbody_type) %>%
             addPolygons(data = my_lk %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Lake",  fillColor = "steelblue", color = "steelblue", weight = 1, fillOpacity = 1, label = my_lk$waterbody_type) %>%
-            addPolygons(data = my_gl %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Glacier",  fillColor = "grey", color = "grey", weight = 1, fillOpacity = 0.1, label = my_gl$waterbody_type) %>%
+            addPolygons(data = my_gl %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Glacier",  fillColor = "grey", color = "grey", weight = 1, fillOpacity = 0.3, label = my_gl$waterbody_type) %>%
             addPolygons(data = my_wf %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Fire",  fillColor = "red", color = "red", weight = 2, opacity = 1, fillOpacity = 0.1, label = paste0("Fire year:",my_wf$fire_year)) %>%
             addPolygons(data = my_cb %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Cutblock",  fillColor = "darkgreen", color = "darkgreen", weight = 1, fillOpacity = 0.1, label = paste("Harvest year:",my_cb$harvest_year)) %>%
             addLayersControl(baseGroups = c("BC Basemap","WorldImagery", "WorldTopoMap"),
@@ -638,7 +639,7 @@ server <- function(input, output, session) {
 
 
         # climate ####
-        incProgress(1, detail = "Get climate BC")
+        incProgress(1, detail = "Get climateBC")
 
         climateBC <- terra::rast("/vsicurl/https://bcbasin.s3.ca-central-1.amazonaws.com/climateBC.tif",
                              win = terra::ext(new_ws2 %>% st_transform(4326)))
