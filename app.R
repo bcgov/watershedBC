@@ -327,7 +327,7 @@ server <- function(input, output, session) {
 
     new_ws2 <- new_ws()
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Parsnip River'") %>% mutate(area_km2 = area_m2/(1000*1000))
-    # new_ws2 <- st_read(conn, query = paste0("SELECT * FROM basinsv4 WHERE ST_Intersects(geom, ST_Transform(ST_SetSRID(ST_MakePoint(",-123,",",55,"), 4326),3005)) ORDER BY area_m2 ASC LIMIT 1")) %>% mutate(area_km2 = area_m2 / (1000 * 1000)) %>% rename(gnis_name = basin, gnis_id = id)
+    # new_ws2 <- st_read(conn, query = paste0("SELECT * FROM basinsv4 WHERE id = 450090")) %>% rename(gnis_name = basin, gnis_id = id)
 
     if (new_ws2$area_km2 > 15000) {
       output$ws_run <- renderText({"Watershed is too large... please select a smaller watershed"})}
