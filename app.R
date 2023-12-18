@@ -761,11 +761,11 @@ server <- function(input, output, session) {
           initial_map %>%
             addPolygons(data = new_ws2 %>% st_transform(4326), fillOpacity = 0, weight = 2, color = "blue") %>%
             addPolylines(data = dra %>% st_transform(4326), group = "Roads", fillColor = "black", color = "black", weight = 1, fillOpacity = 1, label = dra$transport_line_surface_code_desc) %>%
-            addGlPolygons(data = my_wl %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Wetland", fillColor = "yellow", color = "pink", weight = 1, fillOpacity = 0.3, label = my_wl$waterbody_type) %>%
-            addGlPolygons(data = my_lk %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Lake", fillColor = "steelblue", color = "steelblue", weight = 1, fillOpacity = 1, label = my_lk$waterbody_type) %>%
-            addGlPolygons(data = my_gl %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Glacier", fillColor = "grey", color = "grey", weight = 1, fillOpacity = 0.3, label = my_gl$waterbody_type) %>%
-            addGlPolygons(data = my_wf %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Fire", fillColor = "red", color = "red", weight = 2, opacity = 1, fillOpacity = 0.3, label = paste0("Fire year:", my_wf$fire_year)) %>%
-            addGlPolygons(data = my_cb %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Cutblock", fillColor = "darkgreen", color = "darkgreen", weight = 1, fillOpacity = 0.3, label = paste("Harvest year:", my_cb$harvest_year)) %>%
+            addPolygons(data = my_wl %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Wetland", fillColor = "yellow", color = "pink", weight = 1, fillOpacity = 0.3, label = my_wl$waterbody_type) %>%
+            addPolygons(data = my_lk %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Lake", fillColor = "steelblue", color = "steelblue", weight = 1, fillOpacity = 1, label = my_lk$waterbody_type) %>%
+            addPolygons(data = my_gl %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Glacier", fillColor = "grey", color = "grey", weight = 1, fillOpacity = 0.3, label = my_gl$waterbody_type) %>%
+            addPolygons(data = my_wf %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Fire", fillColor = "red", color = "red", weight = 2, opacity = 1, fillOpacity = 0.3, label = paste0("Fire year:", my_wf$fire_year)) %>%
+            addPolygons(data = my_cb %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Cutblock", fillColor = "darkgreen", color = "darkgreen", weight = 1, fillOpacity = 0.3, label = paste("Harvest year:", my_cb$harvest_year)) %>%
             addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap"),
                              overlayGroups = c("Sentinel 2023 (slow)", "Landsat 2020-2023 (slow)", "Landsat 1985-1990 (slow)", "Wetland", "Lake", "Glacier", "Fire", "Cutblock", "Roads"),
                              options = layersControlOptions(collapsed = T)) %>%
@@ -776,7 +776,8 @@ server <- function(input, output, session) {
                       colors = c("yellow","steelblue","grey","red","darkgreen"),
                       labels = c("FWA Wetland", "FWA Lake", "FWA Glacier", "Wildfire","Cutblock"),
                       title = "",
-                      opacity = 1)})
+                      opacity = 1)
+          })
 
         ## DOWNLOAD BUTTONS ####
         output$downloadWatershed <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name),"_",new_ws2$gnis_id,"_watershed.sqlite")},content = function(file) {st_write(my_wl, file)})
