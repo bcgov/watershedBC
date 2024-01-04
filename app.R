@@ -60,6 +60,7 @@ names <- readRDS("named.RDS")
 # FUNCTIONS ####################################################################
 
 postgis_get_pol <-
+
   function(to_clip = "fwa_named", to_clip_cols_to_keep = "*", elev = T, my_wkt = new_ws2_wkt, min_area_km2 = 0.01) {
 
     q <- paste0(
@@ -139,7 +140,7 @@ ui <- navbarPage(
              actionButton(inputId = "zoom_to_button", label = "Zoom to..")),
 
       column(width = 10,
-             leafletOutput("mymap", height = '600px') %>% withSpinner(color = "steelblue", caption = "Updating map..."),
+             leafletOutput("mymap", height = '600px') %>% withSpinner(color = "steelblue"),
              h3(textOutput(outputId = "ws_selection")),
              actionButton(inputId = "run_button", label = "Run Report"),
              textOutput(outputId = "ws_run"),
@@ -163,7 +164,8 @@ ui <- navbarPage(
              downloadButton("downloadLakes", "Lakes"),
              downloadButton("downloadWetlands", "Wetlands"),
              downloadButton("downloadGlaciers", "Glaciers"),
-             downloadButton("downloadRoads", "Roads"), br(), br(), br())),
+             downloadButton("downloadRoads", "Roads"), br(), br(), br()
+             )),
 
     fluidRow(
       column(width = 12,
@@ -301,13 +303,16 @@ server <- function(input, output, session) {
 
   observeEvent(input$run_button, {
 
+    # output$all_plots <- renderUI({})
+
     new_ws2 <- new_ws()
-    # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Parsnip River'") %>% mutate(area_km2 = area_m2/(1000*1000))
+    # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Bowron River'") %>% mutate(area_km2 = area_m2/(1000*1000))
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Tsetzi Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
     # new_ws2 <- st_read(conn, query = paste0("SELECT * FROM basinsv4 WHERE id = 45009")) %>% rename(gnis_name = basin, gnis_id = id) %>% mutate(area_km2 = area_m2/(1000*1000))
 
-    if (new_ws2$area_km2 > 15000) {
-      output$ws_run <- renderText({"Watershed is too large... please select a smaller watershed"})}
+if (new_ws2$area_km2 > 15000) {
+
+  output$ws_run <- renderText({"Watershed is too large... please select a smaller watershed"})}
 
     if (new_ws2$area_km2 < 15000) {
 
@@ -330,6 +335,7 @@ server <- function(input, output, session) {
               area_km2 > new_ws2$area_km2 ~ "Downstream",
               area_km2 < new_ws2$area_km2 ~ "Upstream",
               TRUE ~ ""))
+
         output$table_named <- renderTable(
           my_named %>% st_drop_geometry() %>%
             mutate(area_km2 = round(area_km2, 1)) %>%
@@ -503,13 +509,17 @@ server <- function(input, output, session) {
         my_stream_network <- bcdc_query_geodata("freshwater-atlas-stream-network") %>%
           filter(INTERSECTS(new_ws2)) %>%
           filter(STREAM_ORDER > SO) %>%
+          filter(!is.na(GNIS_NAME)) %>%
           collect()
+
+        my_stream_network_l <- my_stream_network %>% st_intersection(new_ws2)
+        my_stream_network_l <- my_stream_network_l %>% group_by(GNIS_NAME) %>% summarize() %>% mutate(length_km = round(as.numeric(st_length(.)/(1000)), 1)) %>% st_drop_geometry()
+
 
         if(nrow(my_stream_network) > 0){
 
           # CAST TO XYZ POINTS
           my_stream_network_pt <- my_stream_network %>%
-            filter(!is.na(GNIS_NAME)) %>%
             st_cast(to = "POINT") %>%
             dplyr::select(geometry, BLUE_LINE_KEY, GNIS_NAME) %>%
             mutate(coords = st_coordinates(.)) %>%
@@ -518,6 +528,9 @@ server <- function(input, output, session) {
                    Z = coords[, "Z"]) %>%
             dplyr::select(-coords) %>%
             arrange(Z)
+
+          my_stream_network_pt <- my_stream_network_pt %>%
+            st_intersection(new_ws2)
 
           my_stream_network_pt <-
             my_stream_network_pt[seq(1, nrow(my_stream_network_pt), 10),]
@@ -621,11 +634,17 @@ server <- function(input, output, session) {
             mutate(name = paste0(GNIS_NAME))#," \n(",BLUE_LINE_KEY,")"))
 
           output$plot_profile <- renderPlotly({
-            ggplotly(my_stream_network_main_pt %>%
-                       ggplot() +
-                       geom_line(aes(dist_tot_m / 1000, Z, color = name)) +
+
+            t <- my_stream_network_main_pt %>%
+              left_join(my_stream_network_l %>% st_drop_geometry()) %>%
+              mutate(label = paste0(GNIS_NAME, " (", round(length_km,1)," km)"))
+
+            t$label  <- with(t, reorder(label, -length_km))
+
+            ggplotly(ggplot(t) +
+                       geom_line(aes(dist_tot_m / 1000, Z, color = label)) +
                        theme_bw() +
-                       labs(x = "Distance along stream km", y = "Elevation m a.s.l.", color = "Name", title = "Stream Profile"),
+                       labs(x = "Distance along stream km", y = "Elevation m a.s.l.", color = "Name", title = "Stream Profile") ,
               dynamicTicks = T, width = 600, height = 300)
           })
         }
@@ -803,7 +822,35 @@ server <- function(input, output, session) {
                                 area_km2 = round(new_ws()$area_km2,1),
                                 basin_source = basin_source()), append = TRUE)
       })
-      }
+    }
+
+    # output$all_plots <- renderUI({
+    #   if(new_ws2$area_km2 > 0)
+    #     fluidRow(
+    #       tableOutput('table_named'),
+    #       plotlyOutput("plot_profile"),
+    #       plotlyOutput("plot_timeseries"),
+    #       plotlyOutput("plot_timeseries_cumsum"),
+    #       plotlyOutput("plot_elevbins"),
+    #       plotlyOutput("plot_fwa"),
+    #       plotlyOutput("plot_dra"),
+    #       plotlyOutput("plot_mat"),
+    #       plotlyOutput("plot_map"),
+    #       plotlyOutput("plot_cmd"),
+    #       plotOutput("plot_landsat_1985", width = 800, height = 800),
+    #       plotOutput("plot_landsat_2020", width = 800, height = 800),
+    #       plotOutput("plot_sentinel_2023", width = 800, height = 800)),
+    #       downloadButton("downloadWatershed", "Watershed"),
+    #       downloadButton("downloadCutblocks", "Cutblocks"),
+    #       downloadButton("downloadWildfires", "Wildfire"),
+    #       downloadButton("downloadLakes", "Lakes"),
+    #       downloadButton("downloadWetlands", "Wetlands"),
+    #       downloadButton("downloadGlaciers", "Glaciers"),
+    #       downloadButton("downloadRoads", "Roads"), br(), br(), br()
+    #   else
+    #     tableOutput('table_named')
+    # })
+
   })
   }
 
