@@ -59,9 +59,10 @@ names <- readRDS("named.RDS")
 
 # FUNCTIONS ####################################################################
 
-postgis_get_pol <-
-
-  function(to_clip = "fwa_named", to_clip_cols_to_keep = "*", elev = T, my_wkt = new_ws2_wkt, min_area_km2 = 0.01) {
+postgis_get_pol <- function(to_clip = "fwa_named", to_clip_cols_to_keep = "*", elev = T, my_wkt = new_ws2_wkt, min_area_km2 = 0.01) {
+  # to_clip = "fwa_wetlands"
+  # to_clip_cols_to_keep = "waterbody_type"
+  # my_wkt = new_ws2_wkt
 
     q <- paste0(
       "SELECT w.*,
@@ -77,9 +78,11 @@ postgis_get_pol <-
         ms_explode() %>%
         mutate(clipped_area_m2 = as.numeric(st_area(.))) %>%
         filter(clipped_area_m2 > min_area_km2*(1000*1000))
-      if (elev == T) {
-        o <- o %>% bind_cols( elevatr::get_aws_points(o %>% st_centroid(), verbose = FALSE)[[1]] %>% st_drop_geometry() %>% dplyr::select(elevation))}
-        o <- o  %>% st_buffer(1) %>% st_cast("POLYGON")}
+      if (nrow(o) > 0) {
+        if (elev == T) {
+          o <- o %>% bind_cols( elevatr::get_aws_points(o %>% st_centroid(), verbose = FALSE)[[1]] %>% st_drop_geometry() %>% dplyr::select(elevation))
+          }
+          o <- o  %>% st_buffer(1) %>% st_cast("POLYGON")}}
 
     if (nrow(o) > 0) {
       o <- o %>%
@@ -218,7 +221,7 @@ server <- function(input, output, session) {
       point <- input$mymap_click
       # point <- data.frame(lat=51.1888118537981, lng=-121.346066558124)
       # point <- data.frame(lat=52.9536023000285, lng=-125.065826398538)
-
+      # point <- data.frame(lat=54.9220840082985, lng=-128.177715830218)
       print(paste0("point <- data.frame(lat=", point$lat, ", lng=", point$lng,")"))
 
       if (input$watershed_source == "Freshwater Atlas Named Watersheds") {
@@ -237,7 +240,8 @@ server <- function(input, output, session) {
                ORDER BY area_m2 ASC LIMIT 1")) %>%
             mutate(area_km2 = area_m2 / (1000 * 1000)) %>%
             rename(gnis_name = id, gnis_id = basin) %>%
-            ms_simplify(keep = 0.5))}
+            ms_simplify(keep = 0.5))
+        }
 
       output$ws_selection <- renderText({paste0("You selected ", new_ws()$gnis_name," (",format(round(as.numeric(new_ws()$area_km2), 0), big.mark = ",") ," sq.km)")})
       output$ws_selection_pred_time <- renderText({paste0("Estimated time to run report ~ ",0.5 + round((new_ws()$area_km2 * 0.03) / 60, 1)," min")})
@@ -315,7 +319,7 @@ server <- function(input, output, session) {
     new_ws2 <- new_ws()
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Bowron River'") %>% mutate(area_km2 = area_m2/(1000*1000))
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'McMillan Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
-    # new_ws2 <- st_read(conn, query = paste0("SELECT * FROM basinsv4 WHERE id = 45009")) %>% rename(gnis_name = basin, gnis_id = id) %>% mutate(area_km2 = area_m2/(1000*1000))
+    # new_ws2 <- st_read(conn, query = paste0("SELECT * FROM basinsv4 WHERE id = 360981")) %>% rename(gnis_name = basin, gnis_id = id) %>% mutate(area_km2 = area_m2/(1000*1000))
 
 if (new_ws2$area_km2 > 15000) {
 
@@ -741,7 +745,7 @@ if (new_ws2$area_km2 > 15000) {
               group_by(period, ssp, year) %>%
               dplyr::summarize(min = quantile(value, probs = 0.25, na.rm = T),
                         mean = mean(value, na.rm = T),
-                        max = quantile(value, probs = 0.75, na.rm = T),) %>%
+                        max = quantile(value, probs = 0.75, na.rm = T)) %>%
               ggplot() +
               geom_rect(aes(xmin = year - 14, xmax = year + 15, ymin = min, ymax = max, color = ssp, fill = ssp, group = period), alpha = 0.2) +
               labs(x = "Climate Normal Period", y = "Mean Annual Temperature") +
