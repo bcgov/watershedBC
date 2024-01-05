@@ -151,6 +151,7 @@ ui <- navbarPage(
              plotlyOutput("plot_timeseries_cumsum"),
              plotlyOutput("plot_elevbins"),
              plotlyOutput("plot_fwa"),
+             plotlyOutput("plot_gl"),
              plotlyOutput("plot_dra"),
              plotlyOutput("plot_mat"),
              plotlyOutput("plot_map"),
@@ -161,9 +162,11 @@ ui <- navbarPage(
              downloadButton("downloadWatershed", "Watershed"),
              downloadButton("downloadCutblocks", "Cutblocks"),
              downloadButton("downloadWildfires", "Wildfire"),
-             downloadButton("downloadLakes", "Lakes"),
-             downloadButton("downloadWetlands", "Wetlands"),
-             downloadButton("downloadGlaciers", "Glaciers"),
+             downloadButton("downloadLakes", "FWA - Lakes"),
+             downloadButton("downloadWetlands", "FWA - Wetlands"),
+             downloadButton("downloadGlaciers", "FWA - Glaciers"),
+             downloadButton("downloadGlaciers85", "Glaciers 1985"),
+             downloadButton("downloadGlaciers21", "Glaciers 2021"),
              downloadButton("downloadRoads", "Roads"), br(), br(), br()
              )),
 
@@ -307,7 +310,7 @@ server <- function(input, output, session) {
 
     new_ws2 <- new_ws()
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Bowron River'") %>% mutate(area_km2 = area_m2/(1000*1000))
-    # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Tsetzi Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
+    # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Robson River'") %>% mutate(area_km2 = area_m2/(1000*1000))
     # new_ws2 <- st_read(conn, query = paste0("SELECT * FROM basinsv4 WHERE id = 45009")) %>% rename(gnis_name = basin, gnis_id = id) %>% mutate(area_km2 = area_m2/(1000*1000))
 
 if (new_ws2$area_km2 > 15000) {
@@ -359,6 +362,29 @@ if (new_ws2$area_km2 > 15000) {
         print("getting glaciers")
         my_gl <- postgis_get_pol("fwa_glaciers","waterbody_type",my_wkt = new_ws2_wkt)
         if(nrow(my_gl) == 0) {my_gl <- st_as_sf(data.frame(clipped_area_m2 = 0,waterbody_type = "",elevation = 0,area_m2 = 0,lat = 0,long = 0,type = "fwa_glaciers"), coords = c("long", "lat"), crs = 3005)}
+        my_gl_1985 <- bcdata::bcdc_query_geodata("historical-glaciers") %>% select(GBA_GLHIST_SYSID, GLACIER_ID, SOURCE_YEAR, FEATURE_AREA_SQM) %>% filter(INTERSECTS(new_ws2)) %>% collect()
+        if(nrow(my_gl_1985)>0){my_gl_1985 <- my_gl_1985 %>% st_intersection(new_ws2)}else{my_gl_1985 <- st_as_sf(data.frame(FEATURE_AREA_SQM = 0,lat = 0,long = 0,SOURCE_YEAR = 1985), coords = c("long", "lat"), crs = 3005)}
+        my_gl_2021 <- bcdata::bcdc_query_geodata("glaciers") %>% select(GLACIER_ID, SOURCE_YEAR, FEATURE_AREA_SQM) %>% filter(INTERSECTS(new_ws2)) %>% collect() %>% st_intersection(new_ws2)
+        if(nrow(my_gl_2021)>0){my_gl_2021 <- my_gl_2021 %>% st_intersection(new_ws2)}else{my_gl_2021 <- st_as_sf(data.frame(FEATURE_AREA_SQM = 0,lat = 0,long = 0,SOURCE_YEAR = 2021), coords = c("long", "lat"), crs = 3005)}
+
+      output$plot_gl <- renderPlotly({
+          ggplotly(bind_rows(my_gl_1985 %>% st_drop_geometry(),
+                             my_gl_2021 %>% st_drop_geometry()) %>%
+                     select(GBA_GLHIST_SYSID,GLACIER_ID, SOURCE_YEAR, FEATURE_AREA_SQM) %>%
+                     pivot_wider(id_cols = GLACIER_ID, names_from = SOURCE_YEAR, values_from = FEATURE_AREA_SQM, names_prefix = "gl_") %>%
+                     mutate(diff = gl_2021-gl_1985) %>%
+                     mutate(`Glacier Area Percent Change` = round(100*(diff/(1000*1000))/(gl_1985/(1000*1000)),1),
+                            `Glacier Area Change (km2)` = round(diff/(1000*1000),1),
+                            `Glacier Area in 1985 (km2)` = round(gl_1985/(1000*1000),1)) %>%
+                     ggplot() +
+                     theme_bw() +
+                     geom_point(aes(`Glacier Area in 1985 (km2)`,`Glacier Area Percent Change`, group = `Glacier Area Change (km2)`)) +
+                     labs(x = "Glacier Area in 1985 (km2)", y = "Glacier Area Percent \nChange from 1985-2021",
+                          title = paste0("Glacier Area Change"," [1985=", round(sum(my_gl_1985$FEATURE_AREA_SQM)/(1000*1000),1),
+                                                                "km2, 2021=",round(sum(my_gl_2021$FEATURE_AREA_SQM)/(1000*1000),1), "km2]")),
+                   dynamicTicks = T, width = 600, height = 300, tooltip = c("GLACIER_ID","x","Glacier Area Change (km2)","y"))
+        })
+
 
         print("merge fwa")
         my_fwa <- bind_rows(data.frame(waterbody_type  = c("W", "L", "G"), area_m2 = c(0, 0, 0) ),
@@ -780,20 +806,22 @@ if (new_ws2$area_km2 > 15000) {
           initial_map %>%
             addPolygons(data = new_ws2 %>% st_transform(4326), fillOpacity = 0, weight = 2, color = "blue") %>%
             addPolylines(data = dra %>% st_transform(4326), group = "Roads", fillColor = "black", color = "black", weight = 1, fillOpacity = 1, label = dra$transport_line_surface_code_desc) %>%
-            addPolygons(data = my_wl %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Wetland", fillColor = "yellow", color = "pink", weight = 1, fillOpacity = 0.3, label = my_wl$waterbody_type) %>%
-            addPolygons(data = my_lk %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Lake", fillColor = "steelblue", color = "steelblue", weight = 1, fillOpacity = 1, label = my_lk$waterbody_type) %>%
-            addPolygons(data = my_gl %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Glacier", fillColor = "grey", color = "grey", weight = 1, fillOpacity = 0.3, label = my_gl$waterbody_type) %>%
+            addPolygons(data = my_wl %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "FWA Wetland", fillColor = "yellow", color = "pink", weight = 1, fillOpacity = 0.3, label = my_wl$waterbody_type) %>%
+            addPolygons(data = my_lk %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "FWA Lake", fillColor = "steelblue", color = "steelblue", weight = 1, fillOpacity = 1, label = my_lk$waterbody_type) %>%
+            addPolygons(data = my_gl %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "FWA Glacier", fillColor = "grey", color = "grey", weight = 1, fillOpacity = 0.3, label = my_gl$waterbody_type) %>%
+            addPolygons(data = my_gl_1985 %>% filter(FEATURE_AREA_SQM > 0) %>% st_transform(4326), group = "Glacier 1985", fillColor = "brown", color = "brown", weight = 1, fillOpacity = 0.3, label = my_gl_1985$SOURCE_YEAR) %>%
+            addPolygons(data = my_gl_2021 %>% filter(FEATURE_AREA_SQM > 0) %>% st_transform(4326), group = "Glacier 2021", fillColor = "blue", color = "blue", weight = 1, fillOpacity = 0.3, label = my_gl_1985$SOURCE_YEAR) %>%
             addPolygons(data = my_wf %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Fire", fillColor = "red", color = "red", weight = 2, opacity = 1, fillOpacity = 0.3, label = paste0("Fire year:", my_wf$fire_year)) %>%
             addPolygons(data = my_cb %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Cutblock", fillColor = "darkgreen", color = "darkgreen", weight = 1, fillOpacity = 0.3, label = paste("Harvest year:", my_cb$harvest_year)) %>%
             addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap"),
-                             overlayGroups = c("Sentinel 2023 (slow)", "Landsat 2020-2023 (slow)", "Landsat 1985-1990 (slow)", "Wetland", "Lake", "Glacier", "Fire", "Cutblock", "Roads"),
+                             overlayGroups = c("Sentinel 2023 (slow)", "Landsat 2020-2023 (slow)", "Landsat 1985-1990 (slow)", "FWA Wetland", "FWA Lake", "FWA Glacier","Glacier 1985","Glacier 2021", "Fire", "Cutblock", "Roads"),
                              options = layersControlOptions(collapsed = T)) %>%
             hideGroup(c("Roads")) %>%
             hideGroup(c("Sentinel 2023 (slow)","Landsat 1985-1990 (slow)","Landsat 2020-2023 (slow)")) %>%
             fitBounds(bbbb$xmin[[1]], bbbb$ymin[[1]], bbbb$xmax[[1]], bbbb$ymax[[1]]) %>%
             addLegend("bottomright",
-                      colors = c("yellow","steelblue","grey","red","darkgreen"),
-                      labels = c("FWA Wetland", "FWA Lake", "FWA Glacier", "Wildfire","Cutblock"),
+                      colors = c("yellow","steelblue","grey","brown","blue","red","darkgreen"),
+                      labels = c("FWA Wetland", "FWA Lake", "FWA Glacier","Glacier 1985","Glacier 2021","Wildfire","Cutblock"),
                       title = "",
                       opacity = 1)
           })
