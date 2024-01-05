@@ -269,26 +269,27 @@ server <- function(input, output, session) {
 
   observeEvent(input$zoom_to_button, {
 
-    tic(quiet = T)
-    basin_source("FWA")
-    withProgress(message = 'Finding watershed...', max = 1,  {
-      split_name <- strsplit(strsplit(input$psql_zoom_to_name, "id:")[[1]][2], ")")[[1]][1]
-      print(input$psql_zoom_to_name)
-      n <- st_read(conn, query = paste0("SELECT * FROM fwa_named WHERE gnis_id = ", split_name))
-      new_ws(n %>% mutate(area_km2 = area_m2 /(1000 * 1000)))
-      output$ws_selection <- renderText({paste0("You selected ", new_ws()$gnis_name," (",format(round(as.numeric(new_ws()$area_km2), 0), big.mark = ",") ," sq.km)")})
-      output$ws_selection_pred_time <- renderText({paste0("Estimated time to run report ~ ",0.5 + round((new_ws()$area_km2 * 0.03) / 60, 1)," min")})
+    if(input$psql_zoom_to_name!=""){
+      tic(quiet = T)
+      basin_source("FWA")
+      withProgress(message = 'Finding watershed...', max = 1,  {
+        split_name <- strsplit(strsplit(input$psql_zoom_to_name, "id:")[[1]][2], ")")[[1]][1]
+        print(input$psql_zoom_to_name)
+        n <- st_read(conn, query = paste0("SELECT * FROM fwa_named WHERE gnis_id = ", split_name))
+        new_ws(n %>% mutate(area_km2 = area_m2 /(1000 * 1000)))
+        output$ws_selection <- renderText({paste0("You selected ", new_ws()$gnis_name," (",format(round(as.numeric(new_ws()$area_km2), 0), big.mark = ",") ," sq.km)")})
+        output$ws_selection_pred_time <- renderText({paste0("Estimated time to run report ~ ",0.5 + round((new_ws()$area_km2 * 0.03) / 60, 1)," min")})
 
-      bbbb <- st_bbox(n %>% st_transform(4326))
-      output$mymap <- renderLeaflet({
-        initial_map %>%
-          addPolygons(data = n %>% st_transform(4326), fillOpacity = 0, weight = 2, color = "blue", group = "Watershed") %>%
-          addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap"),
-                           overlayGroups = c("Sentinel 2023 (slow)","Landsat 2020-2023 (slow)","Landsat 1985-1990 (slow)","Watershed"), options = layersControlOptions(collapsed = T) ) %>%
-          hideGroup(c("Sentinel 2023 (slow)","Landsat 1985-1990 (slow)","Landsat 2020-2023 (slow)")) %>%
-          fitBounds(bbbb$xmin[[1]], bbbb$ymin[[1]], bbbb$xmax[[1]], bbbb$ymax[[1]])
+        bbbb <- st_bbox(n %>% st_transform(4326))
+        output$mymap <- renderLeaflet({
+          initial_map %>%
+            addPolygons(data = n %>% st_transform(4326), fillOpacity = 0, weight = 2, color = "blue", group = "Watershed") %>%
+            addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap"),
+                             overlayGroups = c("Sentinel 2023 (slow)","Landsat 2020-2023 (slow)","Landsat 1985-1990 (slow)","Watershed"), options = layersControlOptions(collapsed = T) ) %>%
+            hideGroup(c("Sentinel 2023 (slow)","Landsat 1985-1990 (slow)","Landsat 2020-2023 (slow)")) %>%
+            fitBounds(bbbb$xmin[[1]], bbbb$ymin[[1]], bbbb$xmax[[1]], bbbb$ymax[[1]])
+        })
       })
-    })
 
     a <- toc()$callback_msg
     output$ws_run <- renderText({a})
@@ -300,7 +301,10 @@ server <- function(input, output, session) {
                                            processing_time = a,
                                            action = "select watershed",
                                            area_km2 = round(new_ws()$area_km2,1),
-                                           basin_source = basin_source()), append = TRUE)})
+                                           basin_source = basin_source()), append = TRUE)
+
+    }
+    })
 
   # RUN REPORT #################################################################
 
@@ -310,7 +314,7 @@ server <- function(input, output, session) {
 
     new_ws2 <- new_ws()
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Bowron River'") %>% mutate(area_km2 = area_m2/(1000*1000))
-    # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Robson River'") %>% mutate(area_km2 = area_m2/(1000*1000))
+    # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'McMillan Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
     # new_ws2 <- st_read(conn, query = paste0("SELECT * FROM basinsv4 WHERE id = 45009")) %>% rename(gnis_name = basin, gnis_id = id) %>% mutate(area_km2 = area_m2/(1000*1000))
 
 if (new_ws2$area_km2 > 15000) {
@@ -363,14 +367,13 @@ if (new_ws2$area_km2 > 15000) {
         my_gl <- postgis_get_pol("fwa_glaciers","waterbody_type",my_wkt = new_ws2_wkt)
         if(nrow(my_gl) == 0) {my_gl <- st_as_sf(data.frame(clipped_area_m2 = 0,waterbody_type = "",elevation = 0,area_m2 = 0,lat = 0,long = 0,type = "fwa_glaciers"), coords = c("long", "lat"), crs = 3005)}
         my_gl_1985 <- bcdata::bcdc_query_geodata("historical-glaciers") %>% select(GBA_GLHIST_SYSID, GLACIER_ID, SOURCE_YEAR, FEATURE_AREA_SQM) %>% filter(INTERSECTS(new_ws2)) %>% collect()
-        if(nrow(my_gl_1985)>0){my_gl_1985 <- my_gl_1985 %>% st_intersection(new_ws2)}else{my_gl_1985 <- st_as_sf(data.frame(FEATURE_AREA_SQM = 0,lat = 0,long = 0,SOURCE_YEAR = 1985), coords = c("long", "lat"), crs = 3005)}
-        my_gl_2021 <- bcdata::bcdc_query_geodata("glaciers") %>% select(GLACIER_ID, SOURCE_YEAR, FEATURE_AREA_SQM) %>% filter(INTERSECTS(new_ws2)) %>% collect() %>% st_intersection(new_ws2)
-        if(nrow(my_gl_2021)>0){my_gl_2021 <- my_gl_2021 %>% st_intersection(new_ws2)}else{my_gl_2021 <- st_as_sf(data.frame(FEATURE_AREA_SQM = 0,lat = 0,long = 0,SOURCE_YEAR = 2021), coords = c("long", "lat"), crs = 3005)}
+        if(nrow(my_gl_1985)>0){my_gl_1985 <- my_gl_1985 %>% st_intersection(new_ws2)}else{my_gl_1985 <- st_as_sf(data.frame(GLACIER_ID = 0, FEATURE_AREA_SQM = 0,lat = 0,long = 0,SOURCE_YEAR = 1985), coords = c("long", "lat"), crs = 3005)}
+        my_gl_2021 <- bcdata::bcdc_query_geodata("glaciers") %>% select(GLACIER_ID, SOURCE_YEAR, FEATURE_AREA_SQM) %>% filter(INTERSECTS(new_ws2)) %>% collect()
+        if(nrow(my_gl_2021)>0){my_gl_2021 <- my_gl_2021 %>% st_intersection(new_ws2)}else{my_gl_2021 <- st_as_sf(data.frame(GLACIER_ID = 0, FEATURE_AREA_SQM = 0,lat = 0,long = 0,SOURCE_YEAR = 2021), coords = c("long", "lat"), crs = 3005)}
 
       output$plot_gl <- renderPlotly({
           ggplotly(bind_rows(my_gl_1985 %>% st_drop_geometry(),
                              my_gl_2021 %>% st_drop_geometry()) %>%
-                     select(GBA_GLHIST_SYSID,GLACIER_ID, SOURCE_YEAR, FEATURE_AREA_SQM) %>%
                      pivot_wider(id_cols = GLACIER_ID, names_from = SOURCE_YEAR, values_from = FEATURE_AREA_SQM, names_prefix = "gl_") %>%
                      mutate(diff = gl_2021-gl_1985) %>%
                      mutate(`Glacier Area Percent Change` = round(100*(diff/(1000*1000))/(gl_1985/(1000*1000)),1),
@@ -833,6 +836,8 @@ if (new_ws2$area_km2 > 15000) {
         output$downloadLakes <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name),"_",new_ws2$gnis_id,"_lakes.sqlite")},content = function(file) {st_write(my_wl, file)})
         output$downloadWetlands <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name),"_",new_ws2$gnis_id,"_wetlands.sqlite")},content = function(file) {st_write(my_wl, file)})
         output$downloadGlaciers <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name),"_",new_ws2$gnis_id,"_glaciers.sqlite")},content = function(file) {st_write(my_gl, file)})
+        output$downloadGlaciers85 <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name),"_",new_ws2$gnis_id,"_glaciers_1985.sqlite")},content = function(file) {st_write(my_gl_1985, file)})
+        output$downloadGlaciers21 <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name),"_",new_ws2$gnis_id,"_glaciers_2021.sqlite")},content = function(file) {st_write(my_gl_2021, file)})
         output$downloadRoads <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name),"_",new_ws2$gnis_id,"_roads.sqlite")}, content = function(file) {st_write(dra, file)})
 
         ## TIME ####
