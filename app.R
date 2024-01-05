@@ -367,9 +367,11 @@ if (new_ws2$area_km2 > 15000) {
         my_gl <- postgis_get_pol("fwa_glaciers","waterbody_type",my_wkt = new_ws2_wkt)
         if(nrow(my_gl) == 0) {my_gl <- st_as_sf(data.frame(clipped_area_m2 = 0,waterbody_type = "",elevation = 0,area_m2 = 0,lat = 0,long = 0,type = "fwa_glaciers"), coords = c("long", "lat"), crs = 3005)}
         my_gl_1985 <- bcdata::bcdc_query_geodata("historical-glaciers") %>% select(GBA_GLHIST_SYSID, GLACIER_ID, SOURCE_YEAR, FEATURE_AREA_SQM) %>% filter(INTERSECTS(new_ws2)) %>% collect()
-        if(nrow(my_gl_1985)>0){my_gl_1985 <- my_gl_1985 %>% st_intersection(new_ws2)}else{my_gl_1985 <- st_as_sf(data.frame(GLACIER_ID = 0, FEATURE_AREA_SQM = 0,lat = 0,long = 0,SOURCE_YEAR = 1985), coords = c("long", "lat"), crs = 3005)}
+        if(nrow(my_gl_1985)>0){my_gl_1985 <- my_gl_1985 %>% st_intersection(new_ws2) %>%
+          mutate(FEATURE_AREA_SQM = as.numeric(st_area(.)))}else{my_gl_1985 <- st_as_sf(data.frame(GLACIER_ID = 0, FEATURE_AREA_SQM = 0,lat = 0,long = 0,SOURCE_YEAR = 1985), coords = c("long", "lat"), crs = 3005)}
         my_gl_2021 <- bcdata::bcdc_query_geodata("glaciers") %>% select(GLACIER_ID, SOURCE_YEAR, FEATURE_AREA_SQM) %>% filter(INTERSECTS(new_ws2)) %>% collect()
-        if(nrow(my_gl_2021)>0){my_gl_2021 <- my_gl_2021 %>% st_intersection(new_ws2)}else{my_gl_2021 <- st_as_sf(data.frame(GLACIER_ID = 0, FEATURE_AREA_SQM = 0,lat = 0,long = 0,SOURCE_YEAR = 2021), coords = c("long", "lat"), crs = 3005)}
+        if(nrow(my_gl_2021)>0){my_gl_2021 <- my_gl_2021 %>% st_intersection(new_ws2) %>%
+          mutate(FEATURE_AREA_SQM = as.numeric(st_area(.)))}else{my_gl_2021 <- st_as_sf(data.frame(GLACIER_ID = 0, FEATURE_AREA_SQM = 0,lat = 0,long = 0,SOURCE_YEAR = 2021), coords = c("long", "lat"), crs = 3005)}
 
       output$plot_gl <- renderPlotly({
           ggplotly(bind_rows(my_gl_1985 %>% st_drop_geometry(),
