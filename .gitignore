@@ -35,3 +35,5 @@ cred.csv
 named.RDS
 /rsconnect/
 /testing/
+/model_functions/
+/monitoring_functions/
