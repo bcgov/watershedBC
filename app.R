@@ -222,30 +222,45 @@ server <- function(input, output, session) {
       # point <- data.frame(lat=51.1888118537981, lng=-121.346066558124)
       # point <- data.frame(lat=52.9536023000285, lng=-125.065826398538)
       # point <- data.frame(lat=54.9220840082985, lng=-128.177715830218)
+      # point <- data.frame(lat=52.8610256545069, lng=-129.063190913424)
       print(paste0("point <- data.frame(lat=", point$lat, ", lng=", point$lng,")"))
 
       if (input$watershed_source == "Freshwater Atlas Named Watersheds") {
         basin_source("FWA")
-        new_ws(st_read(conn,query = paste0(
+        print("FWA")
+        bas <- st_read(conn,query = paste0(
           "SELECT * FROM fwa_named
                WHERE ST_Intersects(geom, ST_Transform(ST_SetSRID(ST_MakePoint(",point$lng,",",point$lat,"), 4326),3005))
-               ORDER BY area_m2 ASC LIMIT 1")) %>%
-            mutate(area_km2 = area_m2 /(1000 * 1000)))}
+               ORDER BY area_m2 ASC LIMIT 1"))
+        print(bas)
+        print(nrow(bas))
+        print(is.null(bas))
+        if(nrow(bas)>0){
+          print("test")
+          new_ws(bas %>%mutate(area_km2 = area_m2 /(1000 * 1000)))}
+        }
 
       if (input$watershed_source == "Custom Basin at Point of Interst") {
         basin_source("basinsv4")
-        new_ws(st_read(conn, query = paste0(
+        print("basinv4")
+        bas <- st_read(conn, query = paste0(
           "SELECT * FROM basinsv4
                WHERE ST_Intersects(geom, ST_Transform(ST_SetSRID(ST_MakePoint(",point$lng,",",point$lat,"), 4326),3005))
-               ORDER BY area_m2 ASC LIMIT 1")) %>%
-            mutate(area_km2 = area_m2 / (1000 * 1000)) %>%
-            rename(gnis_name = id, gnis_id = basin) %>%
-            ms_simplify(keep = 0.5))
+               ORDER BY area_m2 ASC LIMIT 1"))
+        print(bas)
+        if(nrow(bas)>0){
+          new_ws(bas %>%
+              mutate(area_km2 = area_m2 / (1000 * 1000)) %>%
+              rename(gnis_name = id, gnis_id = basin) %>%
+              ms_simplify(keep = 0.5))}
         }
+
+      if(nrow(bas)>0){
 
       output$ws_selection <- renderText({paste0("You selected ", new_ws()$gnis_name," (",format(round(as.numeric(new_ws()$area_km2), 0), big.mark = ",") ," sq.km)")})
       output$ws_selection_pred_time <- renderText({paste0("Estimated time to run report ~ ",0.5 + round((new_ws()$area_km2 * 0.03) / 60, 1)," min")})
 
+      print("map")
       bbbb <- st_bbox(new_ws() %>% st_transform(4326))
       output$mymap <- renderLeaflet({
         initial_map %>%
@@ -255,9 +270,12 @@ server <- function(input, output, session) {
           hideGroup(c("Sentinel 2023 (slow)","Landsat 1985-1990 (slow)","Landsat 2020-2023 (slow)")) %>%
           fitBounds(bbbb$xmin[[1]], bbbb$ymin[[1]], bbbb$xmax[[1]], bbbb$ymax[[1]])
         })
+      }
         })
 
     a <- toc()$callback_msg
+
+    if(nrow(bas)>0){
     output$ws_run <- renderText({a})
 
     dbWriteTable(conn, "usage", data.frame(date_time = as.character(session_start),
@@ -267,7 +285,8 @@ server <- function(input, output, session) {
                                            processing_time = a,
                                            action = "select watershed",
                                            area_km2 = round(new_ws()$area_km2,1),
-                                           basin_source = basin_source()), append = TRUE)})
+                                           basin_source = basin_source()), append = TRUE)
+    }})
 
   # OPTION 2: ZOOM TO NAMED WATERSHED ##########################################
 
