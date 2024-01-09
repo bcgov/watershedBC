@@ -14,7 +14,7 @@ https://bcgov-env.shinyapps.io/watershedBC/
 
 - Named freshwater atlas watersheds
 - Water survey of canada watersheds **(not yet implemented)**
-- Custom watersheds at points of interest **(not yet implemented)**
+- Custom watersheds at points of interest
 
 ### Step 2: Mine the BC Data Catalogue
 
