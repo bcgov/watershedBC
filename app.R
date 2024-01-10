@@ -892,11 +892,8 @@ if (new_ws2$area_km2 > 15000) {
         bbbb <- st_bbox(new_ws2 %>% st_transform(4326))
         output$mymap <- renderLeaflet({
 
-          wap %>% glimpse
           initial_map %>%
             addPolygons(data = new_ws2 %>% st_transform(4326), fillOpacity = 0, weight = 2, color = "blue") %>%
-            addCircles(data = wrl, lng = wrl$lon, lat = wrl$lat, color = "blue", fillColor = "red", group = "Water Rights", label = paste0(wrl$POD_STATUS, " - ", wrl$PRIMARY_LICENSEE_NAME)) %>%
-            addCircles(data = wap, lng = wap$lon, lat = wap$lat, color = "blue", fillColor = "blue", group = "Water Approvals", label = paste0(wap$APPROVAL_STATUS, " - ", wap$APPROVAL_TYPE)) %>%
             addPolylines(data = dra %>% st_transform(4326), group = "Roads", fillColor = "black", color = "black", weight = 1, fillOpacity = 1, label = dra$transport_line_surface_code_desc) %>%
             addPolygons(data = my_wl %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "FWA Wetland", fillColor = "yellow", color = "pink", weight = 1, fillOpacity = 0.3, label = my_wl$waterbody_type) %>%
             addPolygons(data = my_lk %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "FWA Lake", fillColor = "steelblue", color = "steelblue", weight = 1, fillOpacity = 1, label = my_lk$waterbody_type) %>%
@@ -905,6 +902,24 @@ if (new_ws2$area_km2 > 15000) {
             addPolygons(data = my_gl_2021 %>% filter(FEATURE_AREA_SQM > 0) %>% st_transform(4326), group = "Glacier 2021", fillColor = "blue", color = "blue", weight = 1, fillOpacity = 0.3, label = my_gl_1985$SOURCE_YEAR) %>%
             addPolygons(data = my_wf %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Fire", fillColor = "red", color = "red", weight = 2, opacity = 1, fillOpacity = 0.3, label = paste0("Fire year:", my_wf$fire_year)) %>%
             addPolygons(data = my_cb %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Cutblock", fillColor = "darkgreen", color = "darkgreen", weight = 1, fillOpacity = 0.3, label = paste("Harvest year:", my_cb$harvest_year)) %>%
+            addCircles(data = wrl, lng = wrl$lon, lat = wrl$lat, color = "red", fillColor = "red", group = "Water Rights", label = paste0(wrl$POD_STATUS, " - ", wrl$PRIMARY_LICENSEE_NAME),
+                       popup=~paste("<h3> Water Rights Status: ",wrl$POD_STATUS,"</h3>",
+                                    "<b>Licensee Name:</b><br>",wrl$PRIMARY_LICENSEE_NAME, "<br><br>",
+                                    "<b>POD_NUMBER:</b>",wrl$POD_NUMBER, "<br>",
+                                    "<b>POD_SUBTYPE:</b>",wrl$POD_SUBTYPE, "<br>",
+                                    "<b>POD_DIVERSION_TYPE:</b>",wrl$POD_DIVERSION_TYPE, "<br>",
+                                    "<b>PURPOSE_USE:</b>",wrl$PURPOSE_USE, "<br>",
+                                    "<b>QUANTITY:</b>",wrl$QUANTITY," ", wrl$QUANTITY_UNITS, "<br>",
+                                    "<b>QUANTITY_FLAG:</b>",wrl$QUANTITY_FLAG_DESCRIPTION, "<br>",
+                                    "<b>QTY_DIVERSION_MAX_RATE:</b>",wrl$QTY_DIVERSION_MAX_RATE," ", wrl$QTY_UNITS_DIVERSION_MAX_RATE, "<br>", sep=" ")) %>%
+            addCircles(data = wap, lng = wap$lon, lat = wap$lat, color = "blue", fillColor = "blue", group = "Water Approvals", label = paste0(wap$APPROVAL_STATUS, " - ", wap$APPROVAL_TYPE),
+                       popup=~paste("<h3> Water Approvals: ",wap$APPROVAL_STATUS,"</h3>",
+                                    "<b>WATER_APPROVAL_ID:</b>",wap$WATER_APPROVAL_ID, "<br>",
+                                    "<b>APPROVAL_TYPE:</b>",wap$APPROVAL_TYPE, "<br>",
+                                    "<b>WORKS_DESCRIPTION:</b>",wap$WORKS_DESCRIPTION, "<br>",
+                                    "<b>DATE:</b>",wap$APPROVAL_START_DATE, " ",wap$APPROVAL_EXPIRY_DATE, "<br>",
+                                    "<b>QUANTITY:</b>",wap$QUANTITY," ", wap$QUANTITY_UNITS, "<br>",
+                                    "<b>QTY_DIVERSION_MAX_RATE:</b>",wap$QTY_DIVERSION_MAX_RATE," ", wap$QTY_UNITS_DIVERSION_MAX_RATE, "<br>", sep=" ")) %>%
             addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap"),
                              overlayGroups = c("Sentinel 2023 (slow)", "Landsat 2020-2023 (slow)", "Landsat 1985-1990 (slow)",
                                                "FWA Wetland", "FWA Lake", "FWA Glacier","Glacier 1985","Glacier 2021",
@@ -914,10 +929,15 @@ if (new_ws2$area_km2 > 15000) {
             hideGroup(c("Roads")) %>%
             hideGroup(c("Sentinel 2023 (slow)","Landsat 1985-1990 (slow)","Landsat 2020-2023 (slow)")) %>%
             fitBounds(bbbb$xmin[[1]], bbbb$ymin[[1]], bbbb$xmax[[1]], bbbb$ymax[[1]]) %>%
-            addLegend("bottomright",
+            addLegend("bottomleft",
+                      colors = c("blue","red"),
+                      labels = c("Water Approvals","Water Rights"),
+                      title = "Points",
+                      opacity = 1) %>%
+          addLegend("bottomright",
                       colors = c("yellow","steelblue","grey","brown","blue","red","darkgreen"),
                       labels = c("FWA Wetland", "FWA Lake", "FWA Glacier","Glacier 1985","Glacier 2021","Wildfire","Cutblock"),
-                      title = "",
+                      title = "Polygons",
                       opacity = 1)
           })
 
