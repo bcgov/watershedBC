@@ -225,6 +225,7 @@ server <- function(input, output, session) {
       # point <- data.frame(lat=52.9536023000285, lng=-125.065826398538)
       # point <- data.frame(lat=54.9220840082985, lng=-128.177715830218)
       # point <- data.frame(lat=52.8610256545069, lng=-129.063190913424)
+      # point <- data.frame(lat=53.5499973270329, lng=-122.927395631901)
       print(paste0("point <- data.frame(lat=", point$lat, ", lng=", point$lng,")"))
 
       if (input$watershed_source == "Freshwater Atlas Named Watersheds") {
@@ -238,7 +239,6 @@ server <- function(input, output, session) {
         print(nrow(bas))
         print(is.null(bas))
         if(nrow(bas)>0){
-          print("test")
           new_ws(bas %>%mutate(area_km2 = area_m2 /(1000 * 1000)))}
         }
 
@@ -342,7 +342,7 @@ server <- function(input, output, session) {
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Bowron River'") %>% mutate(area_km2 = area_m2/(1000*1000))
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'McMillan Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Joe Smith Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
-    # new_ws2 <- st_read(conn, query = paste0("SELECT * FROM basinsv4 WHERE id = 360981")) %>% rename(gnis_name = basin, gnis_id = id) %>% mutate(area_km2 = area_m2/(1000*1000))
+    # new_ws2 <- st_read(conn, query = paste0("SELECT * FROM basinsv4 WHERE id = 874586")) %>% rename(gnis_name = basin, gnis_id = id) %>% mutate(area_km2 = area_m2/(1000*1000))
 
 if (new_ws2$area_km2 > 15000) {
 
@@ -565,15 +565,23 @@ if (new_ws2$area_km2 > 15000) {
 
         my_stream_network <- bcdc_query_geodata("freshwater-atlas-stream-network") %>%
           filter(INTERSECTS(new_ws2)) %>%
-          filter(STREAM_ORDER > SO) %>%
+          filter(STREAM_ORDER >= SO) %>%
           filter(!is.na(GNIS_NAME)) %>%
           collect()
+
+        if(nrow(my_stream_network) == 0){
+          my_stream_network <- bcdc_query_geodata("freshwater-atlas-stream-network") %>%
+            filter(INTERSECTS(new_ws2)) %>%
+            filter(STREAM_ORDER >= SO) %>%
+            collect() %>%
+            mutate(GNIS_NAME = new_ws2$gnis_name)
+        }
 
         my_stream_network_l <- my_stream_network %>% st_intersection(new_ws2)
         my_stream_network_l <- my_stream_network_l %>% group_by(GNIS_NAME) %>% summarize() %>% mutate(length_km = round(as.numeric(st_length(.)/(1000)), 1)) %>% st_drop_geometry()
 
 
-        if(nrow(my_stream_network) > 0){
+        if(nrow(my_stream_network_l) > 0){
 
           # CAST TO XYZ POINTS
           my_stream_network_pt <- my_stream_network %>%
@@ -809,59 +817,43 @@ if (new_ws2$area_km2 > 15000) {
 
         # WATER ALLOCATIONS ####
         incProgress(1, detail = "Getting water allocations...")
-        print("getting water alloc")
+        print("getting water alloc wap")
 
         # WATER WORKS
         wap <- bcdc_query_geodata("water-approval-points") %>%
           filter(INTERSECTS(new_ws2)) %>%
           select(WATER_APPROVAL_ID, APPROVAL_TYPE, WORKS_DESCRIPTION,
                  QUANTITY, QUANTITY_UNITS, QTY_DIVERSION_MAX_RATE, QTY_UNITS_DIVERSION_MAX_RATE,
-                 APPROVAL_STATUS, APPROVAL_START_DATE, APPROVAL_EXPIRY_DATE) %>% collect() %>%
-          st_intersection(new_ws2 %>% st_geometry()) %>%
-          st_transform(4326) %>% mutate(lon = st_coordinates(.)[,1],
-                                        lat = st_coordinates(.)[,2]) %>%
-          st_drop_geometry()
-        # output$table_wrl <- renderDataTable({
-        #
-        #   wap %>% select(-id) %>%
-        #     DT::datatable(
-        #       options=list(
-        #         pageLength = 5, scrollX = T,
-        #         initComplete = htmlwidgets::JS(
-        #           "function(settings, json) {",
-        #           paste0("$(this.api().table().container()).css({'font-size': '", "8pt", "'});"),
-        #           "}")
-        #       )
-        #     )
-        #
-        # })
+                 APPROVAL_STATUS, APPROVAL_START_DATE, APPROVAL_EXPIRY_DATE) %>% collect()
+
+        if(nrow(wap)>0){
+          wap <- wap %>%
+            st_transform(st_crs(new_ws2)) %>%
+            st_intersection(new_ws2) %>%
+            st_transform(4326) %>% mutate(lon = st_coordinates(.)[,1],
+                                          lat = st_coordinates(.)[,2]) %>%
+            st_drop_geometry()
+          }else{
+            wap <- data.frame(lon = -111, lat = 55) %>% mutate(type = "test") %>%
+              filter(type != "test")
+            }
+
+        print("getting water alloc wrl")
 
         # WATER QUANTITY
         wrl <- bcdc_query_geodata("water-rights-licences-public") %>%
           filter(INTERSECTS(new_ws2)) %>% select(POD_NUMBER, POD_SUBTYPE, POD_DIVERSION_TYPE, POD_STATUS,
                          LICENCE_NUMBER, LICENCE_STATUS, LICENCE_STATUS_DATE, PRIORITY_DATE, PURPOSE_USE_CODE, PURPOSE_USE,
-                       QUANTITY, QUANTITY_UNITS, QUANTITY_FLAG, QUANTITY_FLAG_DESCRIPTION, QTY_DIVERSION_MAX_RATE, QTY_UNITS_DIVERSION_MAX_RATE, PRIMARY_LICENSEE_NAME) %>%
-          collect() %>% st_intersection(new_ws2 %>% st_geometry()) %>%
-          st_transform(4326) %>% mutate(lon = st_coordinates(.)[,1],
-                                        lat = st_coordinates(.)[,2]) %>%
-          st_drop_geometry()
-
-
-        # output$table_wrl <- renderDataTable({
-        #
-        #   wrl %>% select(-id, -WLS_WRL_SYSID) %>%
-        #     DT::datatable(
-        #       options=list(
-        #         pageLength = 5, scrollX = T,
-        #         initComplete = htmlwidgets::JS(
-        #           "function(settings, json) {",
-        #           paste0("$(this.api().table().container()).css({'font-size': '", "8pt", "'});"),
-        #           "}")
-        #       )
-        #     )
-        #
-        # })
-
+                       QUANTITY, QUANTITY_UNITS, QUANTITY_FLAG, QUANTITY_FLAG_DESCRIPTION, QTY_DIVERSION_MAX_RATE, QTY_UNITS_DIVERSION_MAX_RATE, PRIMARY_LICENSEE_NAME) %>%collect()
+        if(nrow(wrl)>0){
+          wrl <- wrl %>%
+            st_transform(st_crs(new_ws2)) %>%
+            st_intersection(new_ws2) %>%
+            st_transform(4326) %>% mutate(lon = st_coordinates(.)[,1],
+                                          lat = st_coordinates(.)[,2]) %>%
+            st_drop_geometry()
+        }else{
+          wrl <- data.frame(lon = -111, lat = 55)%>% mutate(type = "test") %>% filter(type != "test")}
 
         # SATELLITE IMAGERY ####
         incProgress(1, detail = "Update Satellite Imagery")
@@ -888,7 +880,7 @@ if (new_ws2$area_km2 > 15000) {
 
         # UPDATE LEAFLET ####
         incProgress(1, detail = "Update map")
-
+        print("map!")
         bbbb <- st_bbox(new_ws2 %>% st_transform(4326))
         output$mymap <- renderLeaflet({
 
