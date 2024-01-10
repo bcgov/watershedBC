@@ -37,6 +37,8 @@ library(leafgl)
 library(tidyr)
 library(dplyr)
 library(stringr)
+library(DT)
+
 
 # CONNECT TO DATABASE ##########################################################
 
@@ -336,8 +338,10 @@ server <- function(input, output, session) {
     # output$all_plots <- renderUI({})
 
     new_ws2 <- new_ws()
+    # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Tabor Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Bowron River'") %>% mutate(area_km2 = area_m2/(1000*1000))
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'McMillan Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
+    # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Joe Smith Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
     # new_ws2 <- st_read(conn, query = paste0("SELECT * FROM basinsv4 WHERE id = 360981")) %>% rename(gnis_name = basin, gnis_id = id) %>% mutate(area_km2 = area_m2/(1000*1000))
 
 if (new_ws2$area_km2 > 15000) {
@@ -354,11 +358,10 @@ if (new_ws2$area_km2 > 15000) {
         ## NAMED WATERSHEDS ####
         incProgress(1, detail = paste0("Get watersheds (", round(new_ws2$area_km2, 0), ")"))
         print("getting watershed")
-        my_named <- postgis_get_pol("fwa_named","*",elev = F,my_wkt = new_ws2_wkt, min_area_km2 = 5) %>%
+        my_named <- postgis_get_pol("fwa_named","*",elev = F,my_wkt = new_ws2_wkt, min_area_km2 = new_ws2$area_km2*0.1) %>%
           mutate(area_km2 = area_m2 / (1000 * 1000)) %>%
           dplyr::select(gnis_name, area_km2) %>%
           arrange(-area_km2) %>%
-          filter(area_km2 > new_ws2$area_km2 * 0.05) %>%
           mutate(
             Location = case_when(
               gnis_name == new_ws2$gnis_name ~ "Watershed of Interest",
@@ -803,7 +806,64 @@ if (new_ws2$area_km2 > 15000) {
             dynamicTicks = T, width = 600, height = 300)
         })
 
-        ## SATELLITE IMAGERY ####
+
+        # WATER ALLOCATIONS ####
+        incProgress(1, detail = "Getting water allocations...")
+        print("getting water alloc")
+
+        # WATER WORKS
+        wap <- bcdc_query_geodata("water-approval-points") %>%
+          filter(INTERSECTS(new_ws2)) %>%
+          select(WATER_APPROVAL_ID, APPROVAL_TYPE, WORKS_DESCRIPTION,
+                 QUANTITY, QUANTITY_UNITS, QTY_DIVERSION_MAX_RATE, QTY_UNITS_DIVERSION_MAX_RATE,
+                 APPROVAL_STATUS, APPROVAL_START_DATE, APPROVAL_EXPIRY_DATE) %>% collect() %>%
+          st_intersection(new_ws2 %>% st_geometry()) %>%
+          st_transform(4326) %>% mutate(lon = st_coordinates(.)[,1],
+                                        lat = st_coordinates(.)[,2]) %>%
+          st_drop_geometry()
+        # output$table_wrl <- renderDataTable({
+        #
+        #   wap %>% select(-id) %>%
+        #     DT::datatable(
+        #       options=list(
+        #         pageLength = 5, scrollX = T,
+        #         initComplete = htmlwidgets::JS(
+        #           "function(settings, json) {",
+        #           paste0("$(this.api().table().container()).css({'font-size': '", "8pt", "'});"),
+        #           "}")
+        #       )
+        #     )
+        #
+        # })
+
+        # WATER QUANTITY
+        wrl <- bcdc_query_geodata("water-rights-licences-public") %>%
+          filter(INTERSECTS(new_ws2)) %>% select(POD_NUMBER, POD_SUBTYPE, POD_DIVERSION_TYPE, POD_STATUS,
+                         LICENCE_NUMBER, LICENCE_STATUS, LICENCE_STATUS_DATE, PRIORITY_DATE, PURPOSE_USE_CODE, PURPOSE_USE,
+                       QUANTITY, QUANTITY_UNITS, QUANTITY_FLAG, QUANTITY_FLAG_DESCRIPTION, QTY_DIVERSION_MAX_RATE, QTY_UNITS_DIVERSION_MAX_RATE, PRIMARY_LICENSEE_NAME) %>%
+          collect() %>% st_intersection(new_ws2 %>% st_geometry()) %>%
+          st_transform(4326) %>% mutate(lon = st_coordinates(.)[,1],
+                                        lat = st_coordinates(.)[,2]) %>%
+          st_drop_geometry()
+
+
+        # output$table_wrl <- renderDataTable({
+        #
+        #   wrl %>% select(-id, -WLS_WRL_SYSID) %>%
+        #     DT::datatable(
+        #       options=list(
+        #         pageLength = 5, scrollX = T,
+        #         initComplete = htmlwidgets::JS(
+        #           "function(settings, json) {",
+        #           paste0("$(this.api().table().container()).css({'font-size': '", "8pt", "'});"),
+        #           "}")
+        #       )
+        #     )
+        #
+        # })
+
+
+        # SATELLITE IMAGERY ####
         incProgress(1, detail = "Update Satellite Imagery")
 
         v <- vect(new_ws2 %>% st_transform(4326))
@@ -831,8 +891,12 @@ if (new_ws2$area_km2 > 15000) {
 
         bbbb <- st_bbox(new_ws2 %>% st_transform(4326))
         output$mymap <- renderLeaflet({
+
+          wap %>% glimpse
           initial_map %>%
             addPolygons(data = new_ws2 %>% st_transform(4326), fillOpacity = 0, weight = 2, color = "blue") %>%
+            addCircles(data = wrl, lng = wrl$lon, lat = wrl$lat, color = "blue", fillColor = "red", group = "Water Rights", label = paste0(wrl$POD_STATUS, " - ", wrl$PRIMARY_LICENSEE_NAME)) %>%
+            addCircles(data = wap, lng = wap$lon, lat = wap$lat, color = "blue", fillColor = "blue", group = "Water Approvals", label = paste0(wap$APPROVAL_STATUS, " - ", wap$APPROVAL_TYPE)) %>%
             addPolylines(data = dra %>% st_transform(4326), group = "Roads", fillColor = "black", color = "black", weight = 1, fillOpacity = 1, label = dra$transport_line_surface_code_desc) %>%
             addPolygons(data = my_wl %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "FWA Wetland", fillColor = "yellow", color = "pink", weight = 1, fillOpacity = 0.3, label = my_wl$waterbody_type) %>%
             addPolygons(data = my_lk %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "FWA Lake", fillColor = "steelblue", color = "steelblue", weight = 1, fillOpacity = 1, label = my_lk$waterbody_type) %>%
@@ -842,7 +906,10 @@ if (new_ws2$area_km2 > 15000) {
             addPolygons(data = my_wf %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Fire", fillColor = "red", color = "red", weight = 2, opacity = 1, fillOpacity = 0.3, label = paste0("Fire year:", my_wf$fire_year)) %>%
             addPolygons(data = my_cb %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Cutblock", fillColor = "darkgreen", color = "darkgreen", weight = 1, fillOpacity = 0.3, label = paste("Harvest year:", my_cb$harvest_year)) %>%
             addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap"),
-                             overlayGroups = c("Sentinel 2023 (slow)", "Landsat 2020-2023 (slow)", "Landsat 1985-1990 (slow)", "FWA Wetland", "FWA Lake", "FWA Glacier","Glacier 1985","Glacier 2021", "Fire", "Cutblock", "Roads"),
+                             overlayGroups = c("Sentinel 2023 (slow)", "Landsat 2020-2023 (slow)", "Landsat 1985-1990 (slow)",
+                                               "FWA Wetland", "FWA Lake", "FWA Glacier","Glacier 1985","Glacier 2021",
+                                               "Fire", "Cutblock", "Roads",
+                                               "Water Rights", "Water Approvals"),
                              options = layersControlOptions(collapsed = T)) %>%
             hideGroup(c("Roads")) %>%
             hideGroup(c("Sentinel 2023 (slow)","Landsat 1985-1990 (slow)","Landsat 2020-2023 (slow)")) %>%
