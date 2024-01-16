@@ -147,6 +147,7 @@ ui <- navbarPage(
 
       column(width = 10,
              leafletOutput("mymap", height = '600px') %>% withSpinner(color = "steelblue"),
+             checkboxInput(inputId = "active_mouse", label = "Active Cursor", value = T),
              h3(textOutput(outputId = "ws_selection")),
              actionButton(inputId = "run_button", label = "Run Report"),
              textOutput(outputId = "ws_run"),
@@ -218,99 +219,101 @@ server <- function(input, output, session) {
 
   # OPTION 1: CLICK MAP TO SELECT WATERSHED ####################################
   observeEvent(input$mymap_click, {
+    if(input$active_mouse==T){
 
-    tic(quiet = T)
-    withProgress(message = 'Finding watershed...', max = 1,  {
-      point <- input$mymap_click
-      # point <- data.frame(lat=51.1888118537981, lng=-121.346066558124)
-      # point <- data.frame(lat=52.9536023000285, lng=-125.065826398538)
-      # point <- data.frame(lat=54.9220840082985, lng=-128.177715830218)
-      # point <- data.frame(lat=52.8610256545069, lng=-129.063190913424)
-      # point <- data.frame(lat=53.5499973270329, lng=-122.927395631901)
-      # point <- data.frame(lat=55.2572566226242, lng=-124.842198501342)
-      # point <- data.frame(lat=55.7765730186677, lng=-125.069871080532)
-      # point <- data.frame(lat=53.3226709963533, lng=-124.729193722091)
-      print(paste0("point <- data.frame(lat=", point$lat, ", lng=", point$lng,")"))
+      tic(quiet = T)
+      withProgress(message = 'Finding watershed...', max = 1,  {
+        point <- input$mymap_click
+        # point <- data.frame(lat=51.1888118537981, lng=-121.346066558124)
+        # point <- data.frame(lat=52.9536023000285, lng=-125.065826398538)
+        # point <- data.frame(lat=54.9220840082985, lng=-128.177715830218)
+        # point <- data.frame(lat=52.8610256545069, lng=-129.063190913424)
+        # point <- data.frame(lat=53.5499973270329, lng=-122.927395631901)
+        # point <- data.frame(lat=55.2572566226242, lng=-124.842198501342)
+        # point <- data.frame(lat=55.7765730186677, lng=-125.069871080532)
+        # point <- data.frame(lat=53.3226709963533, lng=-124.729193722091)
+        print(paste0("point <- data.frame(lat=", point$lat, ", lng=", point$lng,")"))
 
-      if (input$watershed_source == "Freshwater Atlas Named Watersheds") {
-        basin_source("FWA")
-        print("FWA")
-        bas <- st_read(conn,query = paste0(
-          "SELECT * FROM fwa_named
-               WHERE ST_Intersects(geom, ST_Transform(ST_SetSRID(ST_MakePoint(",point$lng,",",point$lat,"), 4326),3005))
-               ORDER BY area_m2 ASC LIMIT 1"))
-        print(bas)
+        if (input$watershed_source == "Freshwater Atlas Named Watersheds") {
+          basin_source("FWA")
+          print("FWA")
+          bas <- st_read(conn,query = paste0(
+            "SELECT * FROM fwa_named
+                 WHERE ST_Intersects(geom, ST_Transform(ST_SetSRID(ST_MakePoint(",point$lng,",",point$lat,"), 4326),3005))
+                 ORDER BY area_m2 ASC LIMIT 1"))
+          print(bas)
+          if(nrow(bas)>0){
+            new_ws(bas %>%mutate(area_km2 = area_m2 /(1000 * 1000)))}
+        }
+
+        if (input$watershed_source == "Freshwater Atlas by Stream Order") {
+          basin_source("FWA Order")
+          print("FWA Order")
+          bas <- st_read(conn,query = paste0("SELECT * FROM fwa_rollup
+            WHERE ST_Intersects(geom, ST_Transform(ST_SetSRID(ST_MakePoint(",point$lng,",",point$lat,"), 4326),3005))
+            ORDER BY area_m2 ASC LIMIT 1"))
+          print(bas)
+          bas <- bas %>% st_cast("POLYGON", warn = F)
+          print(bas)
+          bas$overl <- bas %>% st_intersects(as.data.frame(point) %>% st_as_sf(coords = c("lng","lat"), crs = 4326) %>% st_transform(st_crs(bas)), sparse = F)
+          print(bas)
+          bas <- bas %>% filter(overl == T) %>% mutate(area_m2 = as.numeric(st_area(.)))
+          print(bas)
+
+          if(nrow(bas)>0){
+            new_ws(bas %>% mutate(area_km2 = area_m2 /(1000 * 1000)) %>%
+                     rename(gnis_name = id, gnis_id = iFWA))}
+        }
+
+        if (input$watershed_source == "Custom Basin at Point of Interst") {
+          basin_source("basinsv4")
+          print("basinv4")
+          bas <- st_read(conn, query = paste0(
+            "SELECT * FROM basinsv4
+                 WHERE ST_Intersects(geom, ST_Transform(ST_SetSRID(ST_MakePoint(",point$lng,",",point$lat,"), 4326),3005))
+                 ORDER BY area_m2 ASC LIMIT 1"))
+          print(bas)
+          if(nrow(bas)>0){
+            new_ws(bas %>%
+                     mutate(area_km2 = area_m2 / (1000 * 1000)) %>%
+                     rename(gnis_name = id, gnis_id = basin) %>%
+                     ms_simplify(keep = 0.5))}
+        }
+
         if(nrow(bas)>0){
-          new_ws(bas %>%mutate(area_km2 = area_m2 /(1000 * 1000)))}
-      }
+          print("T")
 
-      if (input$watershed_source == "Freshwater Atlas by Stream Order") {
-        basin_source("FWA Order")
-        print("FWA Order")
-        bas <- st_read(conn,query = paste0("SELECT * FROM fwa_rollup
-          WHERE ST_Intersects(geom, ST_Transform(ST_SetSRID(ST_MakePoint(",point$lng,",",point$lat,"), 4326),3005))
-          ORDER BY area_m2 ASC LIMIT 1"))
-        print(bas)
-        bas <- bas %>% st_cast("POLYGON", warn = F)
-        print(bas)
-        bas$overl <- bas %>% st_intersects(as.data.frame(point) %>% st_as_sf(coords = c("lng","lat"), crs = 4326) %>% st_transform(st_crs(bas)), sparse = F)
-        print(bas)
-        bas <- bas %>% filter(overl == T) %>% mutate(area_m2 = as.numeric(st_area(.)))
-        print(bas)
+          output$ws_selection <- renderText({paste0("You selected ", new_ws()$gnis_name," (",format(round(as.numeric(new_ws()$area_km2), 0), big.mark = ",") ," sq.km)")})
+          output$ws_selection_pred_time <- renderText({paste0("Estimated time to run report ~ ",0.5 + round((new_ws()$area_km2 * 0.03) / 60, 1)," min")})
 
-        if(nrow(bas)>0){
-          new_ws(bas %>% mutate(area_km2 = area_m2 /(1000 * 1000)) %>%
-                   rename(gnis_name = id, gnis_id = iFWA))}
-      }
+          print("map")
+          bbbb <- st_bbox(bas %>% st_transform(4326))
+          output$mymap <- renderLeaflet({
+            initial_map %>%
+              addPolygons(data = bas %>% st_transform(4326),fillOpacity = 0,weight = 2,color = "blue",group = "Watershed") %>%
+              addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap"),
+                               overlayGroups = c("Sentinel 2023 (slow)","Landsat 2020-2023 (slow)","Landsat 1985-1990 (slow)","Watershed"), options = layersControlOptions(collapsed = T)) %>%
+              hideGroup(c("Sentinel 2023 (slow)","Landsat 1985-1990 (slow)","Landsat 2020-2023 (slow)")) %>%
+              fitBounds(bbbb$xmin[[1]], bbbb$ymin[[1]], bbbb$xmax[[1]], bbbb$ymax[[1]])
+          })
+        }
+      })
 
-      if (input$watershed_source == "Custom Basin at Point of Interst") {
-        basin_source("basinsv4")
-        print("basinv4")
-        bas <- st_read(conn, query = paste0(
-          "SELECT * FROM basinsv4
-               WHERE ST_Intersects(geom, ST_Transform(ST_SetSRID(ST_MakePoint(",point$lng,",",point$lat,"), 4326),3005))
-               ORDER BY area_m2 ASC LIMIT 1"))
-        print(bas)
-        if(nrow(bas)>0){
-          new_ws(bas %>%
-                   mutate(area_km2 = area_m2 / (1000 * 1000)) %>%
-                   rename(gnis_name = id, gnis_id = basin) %>%
-                   ms_simplify(keep = 0.5))}
-      }
-
+      a <- toc()$callback_msg
+      print(a)
       if(nrow(bas)>0){
-        print("T")
+        output$ws_run <- renderText({a})
 
-        output$ws_selection <- renderText({paste0("You selected ", new_ws()$gnis_name," (",format(round(as.numeric(new_ws()$area_km2), 0), big.mark = ",") ," sq.km)")})
-        output$ws_selection_pred_time <- renderText({paste0("Estimated time to run report ~ ",0.5 + round((new_ws()$area_km2 * 0.03) / 60, 1)," min")})
-
-        print("map")
-        bbbb <- st_bbox(bas %>% st_transform(4326))
-        output$mymap <- renderLeaflet({
-          initial_map %>%
-            addPolygons(data = bas %>% st_transform(4326),fillOpacity = 0,weight = 2,color = "blue",group = "Watershed") %>%
-            addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap"),
-                             overlayGroups = c("Sentinel 2023 (slow)","Landsat 2020-2023 (slow)","Landsat 1985-1990 (slow)","Watershed"), options = layersControlOptions(collapsed = T)) %>%
-            hideGroup(c("Sentinel 2023 (slow)","Landsat 1985-1990 (slow)","Landsat 2020-2023 (slow)")) %>%
-            fitBounds(bbbb$xmin[[1]], bbbb$ymin[[1]], bbbb$xmax[[1]], bbbb$ymax[[1]])
-        })
-      }
+        dbWriteTable(conn, "usage", data.frame(date_time = as.character(session_start),
+                                               session_token = session_token,
+                                               gnis_name = new_ws()$gnis_name,
+                                               gnis_id = new_ws()$gnis_id,
+                                               processing_time = a,
+                                               action = "select watershed",
+                                               area_km2 = round(new_ws()$area_km2,1),
+                                               basin_source = basin_source()), append = TRUE)
+      }}
     })
-
-    a <- toc()$callback_msg
-    print(a)
-    if(nrow(bas)>0){
-      output$ws_run <- renderText({a})
-
-      dbWriteTable(conn, "usage", data.frame(date_time = as.character(session_start),
-                                             session_token = session_token,
-                                             gnis_name = new_ws()$gnis_name,
-                                             gnis_id = new_ws()$gnis_id,
-                                             processing_time = a,
-                                             action = "select watershed",
-                                             area_km2 = round(new_ws()$area_km2,1),
-                                             basin_source = basin_source()), append = TRUE)
-    }})
 
   # OPTION 2: ZOOM TO NAMED WATERSHED ##########################################
 
@@ -356,6 +359,9 @@ server <- function(input, output, session) {
   # RUN REPORT #################################################################
 
   observeEvent(input$run_button, {
+
+    if(!is.null(new_ws())){
+      shiny::updateCheckboxInput(inputId = "active_mouse", value = F)
 
     # output$all_plots <- renderUI({})
 
@@ -1010,7 +1016,8 @@ server <- function(input, output, session) {
     #     tableOutput('table_named')
     # })
 
-  })
+  }
+    })
 }
 
 shinyApp(ui, server)
