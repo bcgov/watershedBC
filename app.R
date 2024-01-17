@@ -126,7 +126,7 @@ ui <- navbarPage(
 
     fluidRow(
       column(width = 2,
-             HTML("<b>Get started:</b><br>"),
+             h3("Get started"),
              HTML("1 - Click anywhere in BC to get started<br>
                 2 - Click 'Run Report'<br>
                 3 - Be patient!"),br(),br(),
@@ -139,30 +139,36 @@ ui <- navbarPage(
                selected = "Freshwater Atlas Named Watersheds"),
              shiny::selectizeInput(
                inputId = "psql_zoom_to_name",
-               label = "Search by Name",
+               label = "Or search watersheds by name",
                choices = c("", names$name),
                selected = "",
                multiple = F),
-             actionButton(inputId = "zoom_to_button", label = "Zoom to..")),
+             actionButton(inputId = "zoom_to_button", label = "Zoom to.."), br(),br(),
+             HTML("<b>Map Options</b>"),
+             checkboxInput(
+               inputId = "active_mouse",
+               label = "Watershed Delineation ON",
+               value = T),
+      ),
 
       column(width = 10,
              leafletOutput("mymap", height = '600px') %>% withSpinner(color = "steelblue"),
-             checkboxInput(inputId = "active_mouse", label = "Active Cursor", value = T),
              h3(textOutput(outputId = "ws_selection")),
              actionButton(inputId = "run_button", label = "Run Report"),
              textOutput(outputId = "ws_run"),
              textOutput(outputId = "ws_selection_pred_time"),
              tableOutput('table_named'),
-             plotlyOutput("plot_profile"),
-             plotlyOutput("plot_timeseries"),
-             plotlyOutput("plot_timeseries_cumsum"),
-             plotlyOutput("plot_elevbins"),
-             plotlyOutput("plot_fwa"),
-             plotlyOutput("plot_gl"),
-             plotlyOutput("plot_dra"),
-             plotlyOutput("plot_mat"),
-             plotlyOutput("plot_map"),
-             plotlyOutput("plot_cmd"),
+             plotlyOutput("plot_profile"), htmlOutput("text_plot_profile"),
+             plotlyOutput("plot_timeseries"), htmlOutput("text_plot_timeseries"),
+             plotlyOutput("plot_timeseries_cumsum"), htmlOutput("text_plot_timeseries_cumsum"),
+             plotlyOutput("plot_eca"), htmlOutput("text_plot_eca"),
+             plotlyOutput("plot_elevbins"), htmlOutput("text_plot_elevbins"),
+             plotlyOutput("plot_fwa"), htmlOutput("text_plot_fwa"),
+             plotlyOutput("plot_gl"), htmlOutput("text_plot_gl"),
+             plotlyOutput("plot_dra"), htmlOutput("text_plot_dra"),
+             plotlyOutput("plot_mat"), htmlOutput("text_plot_mat"),
+             plotlyOutput("plot_map"), htmlOutput("text_plot_map"),
+             plotlyOutput("plot_cmd"), htmlOutput("text_plot_cmd"),
              plotOutput("plot_landsat_1985", width = 800, height = 800),
              plotOutput("plot_landsat_2020", width = 800, height = 800),
              plotOutput("plot_sentinel_2023", width = 800, height = 800),
@@ -224,7 +230,7 @@ server <- function(input, output, session) {
       tic(quiet = T)
       withProgress(message = 'Finding watershed...', max = 1,  {
         point <- input$mymap_click
-        # point <- data.frame(lat=51.1888118537981, lng=-121.346066558124)
+        # point <- data.frame(lat=52.4024188739733, lng=-123.795067416761)
         # point <- data.frame(lat=52.9536023000285, lng=-125.065826398538)
         # point <- data.frame(lat=54.9220840082985, lng=-128.177715830218)
         # point <- data.frame(lat=52.8610256545069, lng=-129.063190913424)
@@ -252,13 +258,9 @@ server <- function(input, output, session) {
           bas <- st_read(conn,query = paste0("SELECT * FROM fwa_rollup
             WHERE ST_Intersects(geom, ST_Transform(ST_SetSRID(ST_MakePoint(",point$lng,",",point$lat,"), 4326),3005))
             ORDER BY area_m2 ASC LIMIT 1"))
-          print(bas)
           bas <- bas %>% st_cast("POLYGON", warn = F)
-          print(bas)
           bas$overl <- bas %>% st_intersects(as.data.frame(point) %>% st_as_sf(coords = c("lng","lat"), crs = 4326) %>% st_transform(st_crs(bas)), sparse = F)
-          print(bas)
           bas <- bas %>% filter(overl == T) %>% mutate(area_m2 = as.numeric(st_area(.)))
-          print(bas)
 
           if(nrow(bas)>0){
             new_ws(bas %>% mutate(area_km2 = area_m2 /(1000 * 1000)) %>%
@@ -366,7 +368,7 @@ server <- function(input, output, session) {
     # output$all_plots <- renderUI({})
 
     new_ws2 <- new_ws()
-    # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Tabor Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
+    # new_ws2 <- bas
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Bowron River'") %>% mutate(area_km2 = area_m2/(1000*1000))
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'McMillan Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Joe Smith Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
@@ -441,7 +443,7 @@ server <- function(input, output, session) {
                      labs(x = "Glacier Area in 1985 (km2)", y = "Glacier Area Percent \nChange from 1985-2021",
                           title = paste0("Glacier Area Change"," [1985=", round(sum(my_gl_1985$FEATURE_AREA_SQM)/(1000*1000),1),
                                          "km2, 2021=",round(sum(my_gl_2021$FEATURE_AREA_SQM)/(1000*1000),1), "km2]")),
-                   dynamicTicks = T, width = 600, height = 300, tooltip = c("GLACIER_ID","x","Glacier Area Change (km2)","y"))
+                   dynamicTicks = T,width = 800, tooltip = c("GLACIER_ID","x","Glacier Area Change (km2)","y"))
         })
 
 
@@ -467,7 +469,7 @@ server <- function(input, output, session) {
                      labs(x = "", y = "Area sq.km", title = "Freshwater Atlas") +
                      scale_fill_manual(values = c("grey", "steelblue", "yellow")) +
                      scale_y_continuous(n.breaks = 10),
-                   dynamicTicks = T, width = 600, height = 300)
+                   dynamicTicks = T,width = 800)
         })
 
         # ROADS ####
@@ -494,19 +496,67 @@ server <- function(input, output, session) {
               labs(x = "", y = "Length km", title = "Total Road Length by Surface Type", fill = "") +
               scale_y_continuous(n.breaks = 10) +
               coord_flip()
-            , dynamicTicks = T, width = 600, height = 300)
+            , dynamicTicks = T,width = 800)
         })
 
         # FORESTS ####
         incProgress(1, detail = "Get Wildfires")
         print("getting fires")
         my_wf <- postgis_get_pol("fire", "fire_year",my_wkt = new_ws2_wkt)
-        if (nrow(my_wf) == 0) {my_wf <- st_as_sf(data.frame(clipped_area_m2 = 0,fire_year = NA_integer_,elevation = 0,area_m2 = 0,lat = 0,long = 0,type = "fire"),coords = c("long", "lat"),crs = 3005)}
+        print(my_wf)
 
         incProgress(1, detail = "Get Cutblocks")
         print("getting blocks")
         my_cb <- postgis_get_pol("cutblocks", "harvest_year",my_wkt = new_ws2_wkt)
-        if (nrow(my_cb) == 0) {my_cb <- st_as_sf(data.frame(clipped_area_m2 = 0,harvest_year = NA_integer_,elevation = 0,area_m2 = 0,lat = 0,long = 0,type = "cutblock"), coords = c("long", "lat"), crs = 3005)}
+        print(my_cb)
+
+        if (nrow(my_wf)==0) {my_wf <- st_as_sf(data.frame(clipped_area_m2 = 0,fire_year = 1900,elevation = 0,area_m2 = 0,lat = 0,long = 0,type = "fire"),coords = c("long", "lat"),crs = 3005)}
+        if (nrow(my_cb)==0) {my_cb <- st_as_sf(data.frame(clipped_area_m2 = 0,harvest_year = 1900,elevation = 0,area_m2 = 0,lat = 0,long = 0,type = "cutblock"), coords = c("long", "lat"), crs = 3005)}
+
+        eca <- bind_rows(my_wf %>% mutate(type = "WILDFIRE") %>% rename(year = fire_year) %>% st_drop_geometry(),
+                         my_cb %>% mutate(type = "CUTBLOCK") %>% rename(year = harvest_year) %>% st_drop_geometry()) %>%
+          as_tibble() %>%
+          mutate(ws_area = as.numeric(st_area(new_ws2[1,]))/(1000*1000),
+                 eca = case_when(type == "WILDFIRE" ~ 100,
+                                 type == "CUTBLOCK" ~ 100))
+
+        e <- do.call(bind_rows, lapply(1:nrow(eca), function(i=1){
+          p <- eca[i,]
+          if(p$type=="WILDFIRE"){slope = 100/40}
+          if(p$type=="CUTBLOCK"){slope = 100/40}
+            years <- (p$year+1):(lubridate::year(lubridate::now()))
+            bind_rows(p, data.frame(year = years) %>% mutate(type = p$type,
+                                                             eca = p$eca-((year-p$year)*slope),
+                                                             area = p$clipped_area_m2/(1000*1000),
+                                                             ws_area = p$ws_area)) %>%
+              mutate(eca = case_when(eca < 0 ~ 0, TRUE ~ eca))}))
+
+          output$plot_eca <- renderPlotly({
+            ggplotly(e %>%
+                       mutate(eca_area = (eca/100)*area,
+                              eca_area_ws_perc = 100*(eca_area/ws_area)) %>%
+                       group_by(type, year) %>%
+                       summarize(eca=sum(eca_area_ws_perc,na.rm=T)) %>%
+                       mutate(eca = signif(eca, 3)) %>%
+                       ggplot() +
+                       geom_col(aes(year,eca, fill = type)) +
+                       theme_bw() +
+                       scale_y_continuous(n.breaks = 10) +
+                       scale_x_continuous(n.breaks = 10) +
+                       labs(x = "Year", y = "ECA (%)", title = "Simplified ECA")+
+                       scale_fill_manual(values = c("darkgreen","orange")),
+                     dynamicTicks = T, width = 800)
+            })
+
+        output$text_plot_eca <- renderText({
+          "<br><b> Equivalent Clearcut Area (ECA)</b> is a basin-wide statistic that is the sum of the total area of all forest disturbance
+          with a reduction factor that account for forest regeneration. ECA is expressed as a percentage of forest disturbance relative to
+          the total forested area of the watershed.The <b>Simplified ECA</b> is a quick calculation that assumes that all wildfires and cutblocks take 40 years to recover. The
+          Simplified ECA does not account for non-forested areas (e.g. alpine, lakes, ..), permanent forest disturbances (e.g. roads, pipelines, ..),
+          forest health factors (e.g. mountain pine beetle, etc.), or variable recovery rates based on site specific factors. This Simplified ECA
+          is not the same as ECA, and should not be misinterpreted as such. Read more about ECA: Winkler and Boone 2017 <a href='https://www.for.gov.bc.ca/hfd/pubs/Docs/En/En118.htm'>
+          Equivalent Clearcut Area as an Indicator of Hydrologic Change in Snow-dominated Watersheds of Southern British Columbia</a><br><br><br>"
+          })
 
         output$plot_timeseries <- renderPlotly({
           ggplotly(
@@ -527,7 +577,14 @@ server <- function(input, output, session) {
               scale_fill_manual(values = c("darkgreen", "orange")) +
               scale_y_continuous(n.breaks = 10) +
               scale_x_continuous(n.breaks = 10),
-            dynamicTicks = T, width = 600, height = 300)
+            dynamicTicks = T,width = 800)
+        })
+
+        output$text_plot_timeseries <- renderText({
+          "<br>The <b>Forest Disturbance History</b> is the total forest disturbance by year. Data is from the <a href='https://catalogue.data.gov.bc.ca/dataset/harvested-areas-of-bc-consolidated-cutblocks-'>
+          Consolidated Cutblocks</a> and <a href ='https://catalogue.data.gov.bc.ca/dataset/fire-perimeters-historical'>Wildfire Perimeter</a>. These datasets are frequently
+          updated. Some limitations of this data include: cutblocks do not include forest removal on private land, cutblocks are incosistently mapped before 1950, older wildfire polygons
+          are generally poorly mapped, and wildfire polygons generally do not account for unburned timber inside of the polygon.<br><br><br>"
         })
 
         output$plot_timeseries_cumsum <- renderPlotly({
@@ -554,8 +611,16 @@ server <- function(input, output, session) {
               scale_fill_manual(values = c("darkgreen", "orange")) +
               scale_y_continuous(n.breaks = 10) +
               scale_x_continuous(n.breaks = 10),
-            dynamicTicks = T, width = 600, height = 300)
+            dynamicTicks = T,width = 800)
         })
+
+        output$text_plot_timeseries_cumsum <- renderText({
+          "<br>The <b>Cumulative Forest Disturbance History</b> is the total forest disturbance by year, accumulated over time. As such, it is possible to have a cumulative forest disturbance
+          that is greater than the total area of the watershed (i.e. > 100%). of Data is from the <a href='https://catalogue.data.gov.bc.ca/dataset/harvested-areas-of-bc-consolidated-cutblocks-'>
+          Consolidated Cutblocks</a> and <a href ='https://catalogue.data.gov.bc.ca/dataset/fire-perimeters-historical'>Wildfire Perimeter</a>. These datasets are frequently
+          updated. Some limitations of this data include: cutblocks do not include forest removal on private land, cutblocks are incosistently mapped before 1950, older wildfire polygons
+          are generally poorly mapped, and wildfire polygons generally do not account for unburned timber inside of the polygon.<br><br><br>"})
+
 
         # LAND COVER BY ELEVATION ####
         incProgress(1, detail = paste0("Getting Polygon Elevation"))
@@ -579,8 +644,12 @@ server <- function(input, output, session) {
               theme_bw() +
               coord_flip() +
               scale_fill_manual(values = c("darkgreen", "orange", "grey", "steelblue", "yellow")),
-            width = 600, height = 400, dynamicTicks = T)
+            dynamicTicks = T, width = 800)
         })
+
+        output$text_plot_elevbins <- renderText({
+          "<br>The <b>Centroid Elevation</b> is the elevation of the centroid of each polygon by type. The elevation source is the SRTM digital elevation model (circa 2000).
+          This only shows the centroid elevation and is not an accurate depiction of the rnage of elevations present in polygons over complex terrain. <br><br><br>"})
 
         # STREAM PROFILE ####
 
@@ -738,9 +807,13 @@ server <- function(input, output, session) {
                        geom_line(aes(dist_tot_m / 1000, Z, color = label)) +
                        theme_bw() +
                        labs(x = "Distance along stream km", y = "Elevation m a.s.l.", color = "Name", title = "Stream Profile") ,
-                     dynamicTicks = T, width = 600, height = 300)
+                     dynamicTicks = T,width = 800)
           })
         }
+
+        output$text_plot_profile <- renderText({
+          "<br>The <b>Stream Profile</b> shows the elevation profile of the stream. The stream network is taken from the <a href='https://catalogue.data.gov.bc.ca/dataset/freshwater-atlas-stream-network'>
+          Freshwater Atlas</a>. The points that make up the stream network have elevation data built in. <br><br><br>"})
 
         # climate ####
         incProgress(1, detail = "Get climateBC")
@@ -809,8 +882,13 @@ server <- function(input, output, session) {
               labs(x = "Climate Normal Period", y = "Mean Annual Temperature") +
               theme_bw()
             ,
-            dynamicTicks = T, width = 600, height = 300)
+            dynamicTicks = T,width = 800)
         })
+
+        output$text_plot_mat <- renderText({
+          "The <b>Mean Annual Temperature</b> shows the range of values from past climate normals and shows future projections under different scenarios. The
+          data source is <a href='https://climatebc.ca/'>ClimateBC</a>. <br><br><br>"})
+
         output$plot_map <- renderPlotly({
           ggplotly(
             climateBC_pts_dat %>%
@@ -824,8 +902,12 @@ server <- function(input, output, session) {
               geom_rect(aes(xmin = year - 14, xmax = year + 15, ymin = min, ymax = max, color = ssp, fill = ssp, group = period), alpha = 0.2) +
               labs(x = "Climate Normal Period", y = "Mean Annual Precipitation") +
               theme_bw(),
-            dynamicTicks = T, width = 600, height = 300)
+            dynamicTicks = T,width = 800)
         })
+        output$text_plot_map <- renderText({
+          "The <b>Mean Annual Precipitation</b> shows the range of values from past climate normals and shows future projections under different scenarios. The
+          data source is <a href='https://climatebc.ca/'>ClimateBC</a>. <br><br><br>"})
+
         output$plot_cmd <-  renderPlotly({
           ggplotly(
             climateBC_pts_dat %>%
@@ -839,8 +921,12 @@ server <- function(input, output, session) {
               geom_rect(aes(xmin = year - 14, xmax = year + 15, ymin = min, ymax = max, color = ssp, fill = ssp, group = period), alpha = 0.2) +
               labs(x = "Climate Normal Period", y = "Cumulative Moisture Deficit") +
               theme_bw(),
-            dynamicTicks = T, width = 600, height = 300)
+            dynamicTicks = T,width = 800)
         })
+
+        output$text_plot_cmd <- renderText({
+          "The <b>Cumulative Moisture Deficit</b> shows the range of values from past climate normals and shows future projections under different scenarios. The
+          data source is <a href='https://climatebc.ca/'>ClimateBC</a>. <br><br><br>"})
 
 
         # WATER ALLOCATIONS ####
