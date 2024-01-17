@@ -393,6 +393,7 @@ server <- function(input, output, session) {
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Bowron River'") %>% mutate(area_km2 = area_m2/(1000*1000))
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'McMillan Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Joe Smith Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
+    # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_id = 44003") %>% mutate(area_km2 = area_m2/(1000*1000))
     # new_ws2 <- st_read(conn, query = paste0("SELECT * FROM basinsv4 WHERE id = 874586")) %>% rename(gnis_name = basin, gnis_id = id) %>% mutate(area_km2 = area_m2/(1000*1000))
 
     if (new_ws2$area_km2 > 15000) {
@@ -410,7 +411,8 @@ server <- function(input, output, session) {
         incProgress(1, detail = paste0("Get watersheds (", round(new_ws2$area_km2, 0), ")"))
         print("getting watershed")
         my_named <- postgis_get_pol("fwa_named","*",elev = F,my_wkt = new_ws2_wkt, min_area_km2 = new_ws2$area_km2*0.1)
-        if(nrow(my_named)>0){my_named = my_named %>%
+        if(nrow(my_named)>0){
+          my_named = my_named %>%
           mutate(area_km2 = area_m2 / (1000 * 1000)) %>%
           dplyr::select(gnis_name, area_km2) %>%
           arrange(-area_km2) %>%
@@ -514,7 +516,8 @@ server <- function(input, output, session) {
               theme_bw() +
               labs(x = "", y = "Length km", title = "Total Road Length", fill = "") +
               scale_y_continuous(n.breaks = 10)
-            , dynamicTicks = T,width = 800)})
+            , dynamicTicks = T,width = 800)
+          })
 
         output$text_plot_dra <- renderText({
           "<br><b>Total Road Length</b> is the total distance of roads in the <a href='https://www2.gov.bc.ca/gov/content/data/geographic-data-services/topographic-data/roads'>
@@ -966,8 +969,8 @@ server <- function(input, output, session) {
             st_transform(st_crs(new_ws2)) %>%
             st_intersection(new_ws2) %>%
             st_transform(4326) %>% mutate(lon = st_coordinates(.)[,1],
-                                          lat = st_coordinates(.)[,2]) %>% st_drop_geometry()
-        }else{
+                                          lat = st_coordinates(.)[,2]) %>% st_drop_geometry()}
+        if(nrow(wap)==0){
           wap <- data.frame(lon = -111, lat = 55) %>% mutate(type = "test",
                                                              QUANTITY = "",
                                                              QUANTITY_UNITS = "",
@@ -986,8 +989,8 @@ server <- function(input, output, session) {
             filter(LICENCE_STATUS %in% "Current") %>%
             st_intersection(new_ws2) %>%
             st_transform(4326) %>% mutate(lon = st_coordinates(.)[,1],
-                                          lat = st_coordinates(.)[,2]) %>% st_drop_geometry()
-        }else{
+                                          lat = st_coordinates(.)[,2]) %>% st_drop_geometry()}
+        if(nrow(wrl)==0){
           wrl <- data.frame(lon = -111, lat = 55)%>% mutate(type = "test",
                                                             QUANTITY = "",
                                                             QUANTITY_UNITS = "",
@@ -1021,7 +1024,8 @@ server <- function(input, output, session) {
               scale_y_continuous(labels = function(x) format(x, big.mark = ",", scientific = F)) +
               labs(y = "Total Annual Water Allocation (cubic metres)", title = "Water Allocations") +
               theme_bw(),
-            dynamicTicks = T, width = 800)})
+            dynamicTicks = T, width = 800)
+          })
 
         output$text_plot_auth <- renderText({
           "<br>The <b>Water Allocations</b> shows the total annual water that has been allocated in the water-approval-points, and water-rights layers.
@@ -1106,7 +1110,7 @@ server <- function(input, output, session) {
                       opacity = 1)
         })
 
-        ## DOWNLOAD BUTTONS ####
+        # DOWNLOAD BUTTONS ####
         output$downloadWatershed <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name),"_",new_ws2$gnis_id,"_watershed.sqlite")},content = function(file) {st_write(my_wl, file)})
         output$downloadCutblocks <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name),"_",new_ws2$gnis_id,"_cutblocks.sqlite")},content = function(file) {st_write(my_wl, file)})
         output$downloadWildfires <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name),"_",new_ws2$gnis_id,"_wildfires.sqlite")},content = function(file) {st_write(my_wl, file)})
