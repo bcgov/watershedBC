@@ -335,24 +335,23 @@ server <- function(input, output, session) {
           basin_source("WSC")
           print("WSC")
 
-          # point <- data.frame(lat=54.02673, lng=-124.0087)
           point_sf <- st_as_sf(point_df, coords = c("lng","lat"), crs = 4326)
 
           wsc_pp_id <- wsc_pp %>%
             mutate(dist = as.numeric(st_distance(., point_sf))) %>%
             filter(dist == min(dist)) %>% pull(stationnum)
 
-              bas <- st_read(conn, query = paste0(
+          bas <- st_read(conn, query = paste0(
                 "SELECT * FROM wsc_drainagebasin_4326
-                   WHERE station_num = '", wsc_pp_id,"'"))
+                WHERE station_num = '", wsc_pp_id,"'"))
 
           print(bas)
 
-            if(nrow(bas)>0){
+          if(nrow(bas)>0){
               new_ws(bas %>%
                        mutate(gnis_name = paste0(bas$station_num," ",bas$name_nom),
                               gnis_id = paste0(bas$station_num," ",bas$name_nom)) %>%
-                       ms_simplify(keep = 0.5))}
+                       ms_simplify(keep = 0.5) %>% st_transform(crs = 3005))}
           }
 
         if(nrow(bas)>0){
@@ -478,7 +477,6 @@ server <- function(input, output, session) {
               area_km2 > new_ws2$area_km2 ~ "Downstream",
               area_km2 < new_ws2$area_km2 ~ "Upstream",
               TRUE ~ ""))
-
 
         output$table_named <- renderTable(
           my_named %>% st_drop_geometry() %>%
@@ -1151,7 +1149,7 @@ server <- function(input, output, session) {
                                                "FWA Wetland", "FWA Lake", "FWA Glacier","Glacier 1985","Glacier 2021",
                                                "Fire", "Cutblock", "Roads",
                                                "Water Rights", "Water Approvals"),
-                             options = layersControlOptions(collapsed = T)) %>%
+                             options = layersControlOptions(collapsed = F)) %>%
             hideGroup(c("Roads")) %>%
             hideGroup(c("Sentinel 2023 (slow)","Landsat 1985-1990 (slow)","Landsat 2020-2023 (slow)")) %>%
             fitBounds(bbbb$xmin[[1]], bbbb$ymin[[1]], bbbb$xmax[[1]], bbbb$ymax[[1]]) %>%
