@@ -234,6 +234,7 @@ ui <- navbarPage(
                  )))))))
 
 # SERVER #######################################################################
+
 server <- function(input, output, session) {
 
   # SESSION INFO
@@ -255,13 +256,17 @@ server <- function(input, output, session) {
 
           leafletProxy("mymap") %>%
             addCircleMarkers(data = wsc_pp_ac, lng = wsc_pp_ac$lon, lat = wsc_pp_ac$lat, color = "blue", radius = 3, group = "WSC Active", label = paste0(wsc_pp_ac$name, " - ", wsc_pp_ac$stationnum)) %>%
-            addCircleMarkers(data = wsc_pp_dc, lng = wsc_pp_dc$lon, lat = wsc_pp_dc$lat, color = "grey", radius = 3, group = "WSC Discontinued", label = paste0(wsc_pp_ac$name, " - ", wsc_pp_ac$stationnum)) %>%
+            addCircleMarkers(data = wsc_pp_dc, lng = wsc_pp_dc$lon, lat = wsc_pp_dc$lat, color = "grey", radius = 3, group = "WSC Discontinued", label = paste0(wsc_pp_dc$name, " - ", wsc_pp_dc$stationnum)) %>%
             hideGroup("WSC Discontinued") %>%
             addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap"),
-                           overlayGroups = c("Sentinel 2023 (slow)", "Landsat 2020-2023 (slow)", "Landsat 1985-1990 (slow)","WSC Active", "WSC Discontinued"))
+                           overlayGroups = c("Sentinel 2023 (slow)", "Landsat 2020-2023 (slow)", "Landsat 1985-1990 (slow)","WSC Active", "WSC Discontinued"), options = layersControlOptions(collapsed = F))
           # })
 
 
+      }else{
+        leafletProxy("mymap") %>%
+          leaflet::clearGroup("WSC Active") %>%
+          leaflet::clearGroup("WSC Discontinued")
       }
     })
 
@@ -344,6 +349,8 @@ server <- function(input, output, session) {
           bas <- st_read(conn, query = paste0(
                 "SELECT * FROM wsc_drainagebasin_4326
                 WHERE station_num = '", wsc_pp_id,"'"))
+
+          bas <- bas %>% rmapshaper::ms_simplify(keep = 0.8)
 
           print(bas)
 
