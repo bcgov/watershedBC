@@ -61,59 +61,42 @@ names <- readRDS("named.RDS")
 
 # FUNCTIONS ####################################################################
 
-postgis_get_line <- function(to_clip = "dra", my_wkt = new_ws2_wkt) {
-
-  q <- paste0(
-    "SELECT w.*,
-              ST_SimplifyPreserveTopology(ST_Intersection(w.geom,ST_GeomFromText('",my_wkt,"', 3005)),5) AS geom
-              FROM ", to_clip, " w
-              WHERE ST_Intersects(w.geom,ST_GeomFromText('",my_wkt,"', 3005))")
-
-  o <-  st_read(conn, query = q)
-
-  if (nrow(o) > 0) {
-    o <- o %>% filter(st_geometry_type(.) %in% c("LINESTRING")) %>%
-      mutate(clipped_length_m = as.numeric(st_length(.)))}else{
-        o <- st_as_sf(data.frame(lon = -111, lat = 55), coords = c("lon", "lat"), crs = 4326) %>% mutate(type = "test") %>% filter(type != "test")
-      }
-  return(o)}
-
 postgis_get_pol <- function(to_clip = "fwa_named", to_clip_cols_to_keep = "*", elev = T, my_wkt = new_ws2_wkt, min_area_km2 = 0.01) {
   # to_clip = "fwa_wetlands"
   # to_clip_cols_to_keep = "waterbody_type"
   # my_wkt = new_ws2_wkt
 
-  q <- paste0(
-    "SELECT w.*,
+    q <- paste0(
+      "SELECT w.*,
               ST_Intersection(w.geom,ST_GeomFromText('",my_wkt,"', 3005)) AS geom
       FROM ", to_clip, " w
       WHERE ST_Intersects(w.geom,ST_GeomFromText('",my_wkt,"', 3005))")
 
-  o <-  st_read(conn, query = q)
+    o <-  st_read(conn, query = q)
 
-  if (nrow(o) > 0) {
-    o <-
-      o %>% filter(st_geometry_type(.) %in% c("POLYGON", "MULTIPOLYGON")) %>%
-      ms_explode() %>%
-      mutate(clipped_area_m2 = as.numeric(st_area(.))) %>%
-      filter(clipped_area_m2 > min_area_km2*(1000*1000))
     if (nrow(o) > 0) {
-      if (elev == T) {
-        o <- o %>% bind_cols( elevatr::get_aws_points(o %>% st_centroid(), verbose = FALSE)[[1]] %>% st_drop_geometry() %>% dplyr::select(elevation))
-      }
-      o <- o  %>% st_buffer(1) %>% st_cast("POLYGON")}}
+      o <-
+        o %>% filter(st_geometry_type(.) %in% c("POLYGON", "MULTIPOLYGON")) %>%
+        ms_explode() %>%
+        mutate(clipped_area_m2 = as.numeric(st_area(.))) %>%
+        filter(clipped_area_m2 > min_area_km2*(1000*1000))
+      if (nrow(o) > 0) {
+        if (elev == T) {
+          o <- o %>% bind_cols( elevatr::get_aws_points(o %>% st_centroid(), verbose = FALSE)[[1]] %>% st_drop_geometry() %>% dplyr::select(elevation))
+          }
+          o <- o  %>% st_buffer(1) %>% st_cast("POLYGON")}}
 
-  if (nrow(o) > 0) {
-    o <- o %>%
-      filter(clipped_area_m2 > 10) %>%
-      mutate(type = to_clip) %>%
-      arrange(-clipped_area_m2)
+    if (nrow(o) > 0) {
+      o <- o %>%
+        filter(clipped_area_m2 > 10) %>%
+        mutate(type = to_clip) %>%
+        arrange(-clipped_area_m2)
+      return(o)
+    } else{
+      o <- st_as_sf(data.frame(lon = -111, lat = 55), coords = c("lon", "lat"), crs = 4326) %>% mutate(type = "test") %>% filter(type != "test")
+    }
     return(o)
-  } else{
-    o <- st_as_sf(data.frame(lon = -111, lat = 55), coords = c("lon", "lat"), crs = 4326) %>% mutate(type = "test") %>% filter(type != "test")
   }
-  return(o)
-}
 
 # BASEMAP ######################################################################
 
@@ -143,7 +126,7 @@ ui <- navbarPage(
 
     fluidRow(
       column(width = 2,
-             h3("Get started"),
+             HTML("<b>Get started:</b><br>"),
              HTML("1 - Click anywhere in BC to get started<br>
                 2 - Click 'Run Report'<br>
                 3 - Be patient!"),br(),br(),
@@ -151,22 +134,15 @@ ui <- navbarPage(
                inputId = "watershed_source",
                label = "Watershed data source",
                choices = c("Freshwater Atlas Named Watersheds",
-                           "Freshwater Atlas by Stream Order",
                            "Custom Basin at Point of Interst"),
                selected = "Freshwater Atlas Named Watersheds"),
              shiny::selectizeInput(
                inputId = "psql_zoom_to_name",
-               label = "Or search watersheds by name",
+               label = "Search by Name",
                choices = c("", names$name),
                selected = "",
                multiple = F),
-             actionButton(inputId = "zoom_to_button", label = "Zoom to.."), br(),br(),
-             HTML("<b>Map Options</b>"),
-             checkboxInput(
-               inputId = "active_mouse",
-               label = "Watershed Delineation ON",
-               value = T),
-      ),
+             actionButton(inputId = "zoom_to_button", label = "Zoom to..")),
 
       column(width = 10,
              leafletOutput("mymap", height = '600px') %>% withSpinner(color = "steelblue"),
@@ -175,18 +151,16 @@ ui <- navbarPage(
              textOutput(outputId = "ws_run"),
              textOutput(outputId = "ws_selection_pred_time"),
              tableOutput('table_named'),
-             plotlyOutput("plot_profile"), htmlOutput("text_plot_profile"),
-             plotlyOutput("plot_timeseries"), htmlOutput("text_plot_timeseries"),
-             plotlyOutput("plot_timeseries_cumsum"), htmlOutput("text_plot_timeseries_cumsum"),
-             plotlyOutput("plot_eca"), htmlOutput("text_plot_eca"),
-             plotlyOutput("plot_elevbins"), htmlOutput("text_plot_elevbins"),
-             plotlyOutput("plot_fwa"), htmlOutput("text_plot_fwa"),
-             plotlyOutput("plot_auth"), htmlOutput("text_plot_auth"),
-             plotlyOutput("plot_gl"), htmlOutput("text_plot_gl"),
-             plotlyOutput("plot_dra"), htmlOutput("text_plot_dra"),
-             plotlyOutput("plot_mat"), htmlOutput("text_plot_mat"),
-             plotlyOutput("plot_map"), htmlOutput("text_plot_map"),
-             plotlyOutput("plot_cmd"), htmlOutput("text_plot_cmd"),
+             plotlyOutput("plot_profile"),
+             plotlyOutput("plot_timeseries"),
+             plotlyOutput("plot_timeseries_cumsum"),
+             plotlyOutput("plot_elevbins"),
+             plotlyOutput("plot_fwa"),
+             plotlyOutput("plot_gl"),
+             plotlyOutput("plot_dra"),
+             plotlyOutput("plot_mat"),
+             plotlyOutput("plot_map"),
+             plotlyOutput("plot_cmd"),
              plotOutput("plot_landsat_1985", width = 800, height = 800),
              plotOutput("plot_landsat_2020", width = 800, height = 800),
              plotOutput("plot_sentinel_2023", width = 800, height = 800),
@@ -199,7 +173,7 @@ ui <- navbarPage(
              downloadButton("downloadGlaciers85", "Glaciers 1985"),
              downloadButton("downloadGlaciers21", "Glaciers 2021"),
              downloadButton("downloadRoads", "Roads"), br(), br(), br()
-      )),
+             )),
 
     fluidRow(
       column(width = 12,
@@ -231,113 +205,90 @@ ui <- navbarPage(
 server <- function(input, output, session) {
 
   # SESSION INFO
-
-    session_start <- Sys.time()
-    session_token <- session$token
+  session_start <- Sys.time()
+  session_token <- session$token
 
   # BASEMAP
-
-    output$mymap <- renderLeaflet({initial_map %>% fitBounds(-139.01451,47.68300,-110.48408,59.99974)})
+  output$mymap <- renderLeaflet({initial_map %>% fitBounds(-139.01451,47.68300,-110.48408,59.99974)})
 
   # CREATE REACTIVE VAL FOR WATERSHED
+  new_ws <- reactiveVal()
+  basin_source <- reactiveVal()
 
-    new_ws <- reactiveVal()
-    basin_source <- reactiveVal()
+  # OPTION 1: CLICK MAP TO SELECT WATERSHED ####################################
+  observeEvent(input$mymap_click, {
 
-# OPTION 1: CLICK MAP TO SELECT WATERSHED ####################################
-
-  # ACTION ON CLICK
-
-    observeEvent(input$mymap_click, {
-
-    # START TIMER
-
-      tic()
-
-      point <- input$mymap_click # point <- data.frame(lat=52.2398896365648, lng=-127.468363996359)
-
+    tic(quiet = T)
+    withProgress(message = 'Finding watershed...', max = 1,  {
+      point <- input$mymap_click
+      # point <- data.frame(lat=51.1888118537981, lng=-121.346066558124)
+      # point <- data.frame(lat=52.9536023000285, lng=-125.065826398538)
+      # point <- data.frame(lat=54.9220840082985, lng=-128.177715830218)
+      # point <- data.frame(lat=52.8610256545069, lng=-129.063190913424)
+      # point <- data.frame(lat=53.5499973270329, lng=-122.927395631901)
       print(paste0("point <- data.frame(lat=", point$lat, ", lng=", point$lng,")"))
 
-      if(input$active_mouse==T){
-
-          if (input$watershed_source == "Freshwater Atlas Named Watersheds") {
-          basin_source("FWA")
-          print("FWA")
-          bas <- st_read(conn,query = paste0(
-            "SELECT * FROM fwa_named
-                 WHERE ST_Intersects(geom, ST_Transform(ST_SetSRID(ST_MakePoint(",point$lng,",",point$lat,"), 4326),3005))
-                 ORDER BY area_m2 ASC LIMIT 1"))
-          print(bas)
-          if(nrow(bas)>0){
-            new_ws(bas %>%mutate(area_km2 = area_m2 /(1000 * 1000)))}
-        }
-
-        if (input$watershed_source == "Freshwater Atlas by Stream Order") {
-          basin_source("FWA Order")
-          print("FWA Order")
-          bas <- st_read(conn,query = paste0("SELECT * FROM fwa_rollup
-            WHERE ST_Intersects(geom, ST_Transform(ST_SetSRID(ST_MakePoint(",point$lng,",",point$lat,"), 4326),3005))
-            ORDER BY area_m2 ASC LIMIT 1"))
-          bas <- bas %>% st_cast("POLYGON", warn = F)
-          bas$overl <- bas %>% st_intersects(as.data.frame(point) %>% st_as_sf(coords = c("lng","lat"), crs = 4326) %>% st_transform(st_crs(bas)), sparse = F)
-          bas <- bas %>% filter(overl == T) %>% mutate(area_m2 = as.numeric(st_area(.)))
-
-          if(nrow(bas)>0){
-            new_ws(bas %>% mutate(area_km2 = area_m2 /(1000 * 1000)) %>%
-                     rename(gnis_name = id, gnis_id = iFWA))}
-        }
-
-        if (input$watershed_source == "Custom Basin at Point of Interst") {
-          basin_source("basinsv4")
-          print("basinv4")
-          bas <- st_read(conn, query = paste0(
-            "SELECT * FROM basinsv4
-                 WHERE ST_Intersects(geom, ST_Transform(ST_SetSRID(ST_MakePoint(",point$lng,",",point$lat,"), 4326),3005))
-                 ORDER BY area_m2 ASC LIMIT 1"))
-          print(bas)
-          if(nrow(bas)>0){
-            new_ws(bas %>%
-                     mutate(area_km2 = area_m2 / (1000 * 1000)) %>%
-                     rename(gnis_name = id, gnis_id = basin) %>%
-                     ms_simplify(keep = 0.5))}
-        }
-
+      if (input$watershed_source == "Freshwater Atlas Named Watersheds") {
+        basin_source("FWA")
+        print("FWA")
+        bas <- st_read(conn,query = paste0(
+          "SELECT * FROM fwa_named
+               WHERE ST_Intersects(geom, ST_Transform(ST_SetSRID(ST_MakePoint(",point$lng,",",point$lat,"), 4326),3005))
+               ORDER BY area_m2 ASC LIMIT 1"))
+        print(bas)
+        print(nrow(bas))
+        print(is.null(bas))
         if(nrow(bas)>0){
-          print("T")
-
-          output$ws_selection <- renderText({paste0("You selected ", new_ws()$gnis_name," (",format(round(as.numeric(new_ws()$area_km2), 0), big.mark = ",") ," sq.km)")})
-          output$ws_selection_pred_time <- renderText({paste0("Estimated time to run report ~ ",0.5 + round((new_ws()$area_km2 * 0.03) / 60, 1)," min")})
-
-          print("map")
-          bbbb <- st_bbox(bas %>% st_transform(4326))
-          output$mymap <- renderLeaflet({
-            initial_map %>%
-              addPolygons(data = bas %>% st_transform(4326),fillOpacity = 0,weight = 2,color = "blue",group = "Watershed") %>%
-              addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap"),
-                               overlayGroups = c("Sentinel 2023 (slow)","Landsat 2020-2023 (slow)","Landsat 1985-1990 (slow)","Watershed"), options = layersControlOptions(collapsed = T)) %>%
-              hideGroup(c("Sentinel 2023 (slow)","Landsat 1985-1990 (slow)","Landsat 2020-2023 (slow)")) %>%
-              fitBounds(bbbb$xmin[[1]], bbbb$ymin[[1]], bbbb$xmax[[1]], bbbb$ymax[[1]])
-          })
+          new_ws(bas %>%mutate(area_km2 = area_m2 /(1000 * 1000)))}
         }
 
-
-      a <- toc()$callback_msg
+      if (input$watershed_source == "Custom Basin at Point of Interst") {
+        basin_source("basinsv4")
+        print("basinv4")
+        bas <- st_read(conn, query = paste0(
+          "SELECT * FROM basinsv4
+               WHERE ST_Intersects(geom, ST_Transform(ST_SetSRID(ST_MakePoint(",point$lng,",",point$lat,"), 4326),3005))
+               ORDER BY area_m2 ASC LIMIT 1"))
+        print(bas)
+        if(nrow(bas)>0){
+          new_ws(bas %>%
+              mutate(area_km2 = area_m2 / (1000 * 1000)) %>%
+              rename(gnis_name = id, gnis_id = basin) %>%
+              ms_simplify(keep = 0.5))}
+        }
 
       if(nrow(bas)>0){
 
-        output$ws_run <- renderText({a})
+      output$ws_selection <- renderText({paste0("You selected ", new_ws()$gnis_name," (",format(round(as.numeric(new_ws()$area_km2), 0), big.mark = ",") ," sq.km)")})
+      output$ws_selection_pred_time <- renderText({paste0("Estimated time to run report ~ ",0.5 + round((new_ws()$area_km2 * 0.03) / 60, 1)," min")})
 
-        dbWriteTable(conn, "usage", data.frame(date_time = as.character(session_start),
-                                               session_token = session_token,
-                                               gnis_name = new_ws()$gnis_name,
-                                               gnis_id = new_ws()$gnis_id,
-                                               processing_time = a,
-                                               action = "select watershed",
-                                               area_km2 = round(new_ws()$area_km2,1),
-                                               basin_source = basin_source()), append = TRUE)
-        }
+      print("map")
+      bbbb <- st_bbox(new_ws() %>% st_transform(4326))
+      output$mymap <- renderLeaflet({
+        initial_map %>%
+          addPolygons(data = new_ws() %>% st_transform(4326),fillOpacity = 0,weight = 2,color = "blue",group = "Watershed") %>%
+          addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap"),
+                           overlayGroups = c("Sentinel 2023 (slow)","Landsat 2020-2023 (slow)","Landsat 1985-1990 (slow)","Watershed"), options = layersControlOptions(collapsed = T)) %>%
+          hideGroup(c("Sentinel 2023 (slow)","Landsat 1985-1990 (slow)","Landsat 2020-2023 (slow)")) %>%
+          fitBounds(bbbb$xmin[[1]], bbbb$ymin[[1]], bbbb$xmax[[1]], bbbb$ymax[[1]])
+        })
       }
-    })
+        })
+
+    a <- toc()$callback_msg
+
+    if(nrow(bas)>0){
+    output$ws_run <- renderText({a})
+
+    dbWriteTable(conn, "usage", data.frame(date_time = as.character(session_start),
+                                           session_token = session_token,
+                                           gnis_name = new_ws()$gnis_name,
+                                           gnis_id = new_ws()$gnis_id,
+                                           processing_time = a,
+                                           action = "select watershed",
+                                           area_km2 = round(new_ws()$area_km2,1),
+                                           basin_source = basin_source()), append = TRUE)
+    }})
 
   # OPTION 2: ZOOM TO NAMED WATERSHED ##########################################
 
@@ -365,40 +316,37 @@ server <- function(input, output, session) {
         })
       })
 
-      a <- toc()$callback_msg
-      output$ws_run <- renderText({a})
+    a <- toc()$callback_msg
+    output$ws_run <- renderText({a})
 
-      dbWriteTable(conn, "usage", data.frame(date_time = as.character(session_start),
-                                             session_token = session_token,
-                                             gnis_name = new_ws()$gnis_name,
-                                             gnis_id = new_ws()$gnis_id,
-                                             processing_time = a,
-                                             action = "select watershed",
-                                             area_km2 = round(new_ws()$area_km2,1),
-                                             basin_source = basin_source()), append = TRUE)
+    dbWriteTable(conn, "usage", data.frame(date_time = as.character(session_start),
+                                           session_token = session_token,
+                                           gnis_name = new_ws()$gnis_name,
+                                           gnis_id = new_ws()$gnis_id,
+                                           processing_time = a,
+                                           action = "select watershed",
+                                           area_km2 = round(new_ws()$area_km2,1),
+                                           basin_source = basin_source()), append = TRUE)
 
     }
-  })
+    })
 
   # RUN REPORT #################################################################
 
   observeEvent(input$run_button, {
 
-    if(!is.null(new_ws())){
-
-      shiny::updateCheckboxInput(inputId = "active_mouse", value = F)
+    # output$all_plots <- renderUI({})
 
     new_ws2 <- new_ws()
-    # new_ws2 <- bas
+    # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Tabor Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Bowron River'") %>% mutate(area_km2 = area_m2/(1000*1000))
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'McMillan Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
     # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Joe Smith Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
-    # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_id = 44003") %>% mutate(area_km2 = area_m2/(1000*1000))
     # new_ws2 <- st_read(conn, query = paste0("SELECT * FROM basinsv4 WHERE id = 874586")) %>% rename(gnis_name = basin, gnis_id = id) %>% mutate(area_km2 = area_m2/(1000*1000))
 
-    if (new_ws2$area_km2 > 15000) {
+if (new_ws2$area_km2 > 15000) {
 
-      output$ws_run <- renderText({"Watershed is too large... please select a smaller watershed"})}
+  output$ws_run <- renderText({"Watershed is too large... please select a smaller watershed"})}
 
     if (new_ws2$area_km2 < 15000) {
 
@@ -410,9 +358,7 @@ server <- function(input, output, session) {
         ## NAMED WATERSHEDS ####
         incProgress(1, detail = paste0("Get watersheds (", round(new_ws2$area_km2, 0), ")"))
         print("getting watershed")
-        my_named <- postgis_get_pol("fwa_named","*",elev = F,my_wkt = new_ws2_wkt, min_area_km2 = new_ws2$area_km2*0.1)
-        if(nrow(my_named)>0){
-          my_named = my_named %>%
+        my_named <- postgis_get_pol("fwa_named","*",elev = F,my_wkt = new_ws2_wkt, min_area_km2 = new_ws2$area_km2*0.1) %>%
           mutate(area_km2 = area_m2 / (1000 * 1000)) %>%
           dplyr::select(gnis_name, area_km2) %>%
           arrange(-area_km2) %>%
@@ -423,14 +369,12 @@ server <- function(input, output, session) {
               area_km2 < new_ws2$area_km2 ~ "Upstream",
               TRUE ~ ""))
 
-
         output$table_named <- renderTable(
           my_named %>% st_drop_geometry() %>%
             mutate(area_km2 = round(area_km2, 1)) %>%
             rename(Name = gnis_name,
                    Area_km2 = area_km2)
           , digits = 2)
-        }
 
         # FRESHWATER ATLAS ####
 
@@ -455,7 +399,7 @@ server <- function(input, output, session) {
         if(nrow(my_gl_2021)>0){my_gl_2021 <- my_gl_2021 %>% st_intersection(new_ws2) %>%
           mutate(FEATURE_AREA_SQM = as.numeric(st_area(.)))}else{my_gl_2021 <- st_as_sf(data.frame(GLACIER_ID = 0, FEATURE_AREA_SQM = 0,lat = 0,long = 0,SOURCE_YEAR = 2021), coords = c("long", "lat"), crs = 3005)}
 
-        output$plot_gl <- renderPlotly({
+      output$plot_gl <- renderPlotly({
           ggplotly(bind_rows(my_gl_1985 %>% st_drop_geometry(),
                              my_gl_2021 %>% st_drop_geometry()) %>%
                      pivot_wider(id_cols = GLACIER_ID, names_from = SOURCE_YEAR, values_from = FEATURE_AREA_SQM, names_prefix = "gl_") %>%
@@ -468,8 +412,8 @@ server <- function(input, output, session) {
                      geom_point(aes(`Glacier Area in 1985 (km2)`,`Glacier Area Percent Change`, group = `Glacier Area Change (km2)`)) +
                      labs(x = "Glacier Area in 1985 (km2)", y = "Glacier Area Percent \nChange from 1985-2021",
                           title = paste0("Glacier Area Change"," [1985=", round(sum(my_gl_1985$FEATURE_AREA_SQM)/(1000*1000),1),
-                                         "km2, 2021=",round(sum(my_gl_2021$FEATURE_AREA_SQM)/(1000*1000),1), "km2]")),
-                   dynamicTicks = T,width = 800, tooltip = c("GLACIER_ID","x","Glacier Area Change (km2)","y"))
+                                                                "km2, 2021=",round(sum(my_gl_2021$FEATURE_AREA_SQM)/(1000*1000),1), "km2]")),
+                   dynamicTicks = T, width = 600, height = 300, tooltip = c("GLACIER_ID","x","Glacier Area Change (km2)","y"))
         })
 
 
@@ -490,20 +434,25 @@ server <- function(input, output, session) {
                      dplyr::summarize(area_km2 = sum(clipped_area_m2, na.rm = T)/(1000*1000)) %>%
                      filter(!is.na(type)) %>%
                      ggplot() +
-                     geom_col(aes(type, area_km2, fill = type), color = "black") +
+                      geom_col(aes(type, area_km2, fill = type), color = "black") +
                      theme_bw() +
                      labs(x = "", y = "Area sq.km", title = "Freshwater Atlas") +
                      scale_fill_manual(values = c("grey", "steelblue", "yellow")) +
                      scale_y_continuous(n.breaks = 10),
-                   dynamicTicks = T,width = 800)
-        })
+                   dynamicTicks = T, width = 600, height = 300)
+          })
 
         # ROADS ####
         incProgress(1, detail = "Get Roads")
         print("getting dra")
-        dra <- postgis_get_line(to_clip = "dra", my_wkt = new_ws2_wkt)
+        dra <- st_read(conn, query = paste0("SELECT w.*,
+                                             ST_SimplifyPreserveTopology(ST_Intersection(w.geom,n.geom),5) AS geom
+                                             FROM dra w
+                                             JOIN fwa_named n
+                                             ON ST_Intersects(w.geom,n.geom) WHERE n.gnis_id = '",new_ws2$gnis_id,"'"))
+
         if(nrow(dra) > 0) {dra <- dra  %>% st_make_valid() %>% mutate(length_km = as.numeric(st_length(.)) / 1000) %>% mutate(type = "dra", group = transport_line_surface_code_desc)
-        }else{dra <- st_as_sf( data.frame(lon = -111, lat = 55, length_km = 0), coords = c("lon", "lat"), crs = 4326 ) %>% mutate(type = "test",group = "test") %>% filter(type != "test") }
+          }else{dra <- st_as_sf( data.frame(lon = -111, lat = 55, length_km = 0), coords = c("lon", "lat"), crs = 4326 ) %>% mutate(type = "test",group = "test") %>% filter(type != "test") }
 
         output$plot_dra <- renderPlotly({
           ggplotly(
@@ -514,73 +463,22 @@ server <- function(input, output, session) {
               ggplot() +
               geom_col(aes(group, length_km))    +
               theme_bw() +
-              labs(x = "", y = "Length km", title = "Total Road Length", fill = "") +
-              scale_y_continuous(n.breaks = 10)
-            , dynamicTicks = T,width = 800)
-          })
-
-        output$text_plot_dra <- renderText({
-          "<br><b>Total Road Length</b> is the total distance of roads in the <a href='https://www2.gov.bc.ca/gov/content/data/geographic-data-services/topographic-data/roads'>
-          Digital Road Atlas</a> of BC.<br><br><br>" })
+              labs(x = "", y = "Length km", title = "Total Road Length by Surface Type", fill = "") +
+              scale_y_continuous(n.breaks = 10) +
+              coord_flip()
+            , dynamicTicks = T, width = 600, height = 300)
+        })
 
         # FORESTS ####
         incProgress(1, detail = "Get Wildfires")
         print("getting fires")
         my_wf <- postgis_get_pol("fire", "fire_year",my_wkt = new_ws2_wkt)
-        print(my_wf)
+        if (nrow(my_wf) == 0) {my_wf <- st_as_sf(data.frame(clipped_area_m2 = 0,fire_year = NA_integer_,elevation = 0,area_m2 = 0,lat = 0,long = 0,type = "fire"),coords = c("long", "lat"),crs = 3005)}
 
         incProgress(1, detail = "Get Cutblocks")
         print("getting blocks")
         my_cb <- postgis_get_pol("cutblocks", "harvest_year",my_wkt = new_ws2_wkt)
-        print(my_cb)
-
-        if (nrow(my_wf)==0) {my_wf <- st_as_sf(data.frame(clipped_area_m2 = 0,fire_year = 1900,elevation = 0,area_m2 = 0,lat = 0,long = 0,type = "fire"),coords = c("long", "lat"),crs = 3005)}
-        if (nrow(my_cb)==0) {my_cb <- st_as_sf(data.frame(clipped_area_m2 = 0,harvest_year = 1900,elevation = 0,area_m2 = 0,lat = 0,long = 0,type = "cutblock"), coords = c("long", "lat"), crs = 3005)}
-
-        eca <- bind_rows(my_wf %>% mutate(type = "WILDFIRE") %>% rename(year = fire_year) %>% st_drop_geometry(),
-                         my_cb %>% mutate(type = "CUTBLOCK") %>% rename(year = harvest_year) %>% st_drop_geometry()) %>%
-          as_tibble() %>%
-          mutate(ws_area = as.numeric(st_area(new_ws2[1,]))/(1000*1000),
-                 eca = case_when(type == "WILDFIRE" ~ 100,
-                                 type == "CUTBLOCK" ~ 100))
-
-        e <- do.call(bind_rows, lapply(1:nrow(eca), function(i=1){
-          p <- eca[i,]
-          if(p$type=="WILDFIRE"){slope = 100/40}
-          if(p$type=="CUTBLOCK"){slope = 100/40}
-            years <- (p$year+1):(lubridate::year(lubridate::now()))
-            bind_rows(p, data.frame(year = years) %>% mutate(type = p$type,
-                                                             eca = p$eca-((year-p$year)*slope),
-                                                             area = p$clipped_area_m2/(1000*1000),
-                                                             ws_area = p$ws_area)) %>%
-              mutate(eca = case_when(eca < 0 ~ 0, TRUE ~ eca))}))
-
-          output$plot_eca <- renderPlotly({
-            ggplotly(e %>%
-                       mutate(eca_area = (eca/100)*area,
-                              eca_area_ws_perc = 100*(eca_area/ws_area)) %>%
-                       group_by(type, year) %>%
-                       summarize(eca=sum(eca_area_ws_perc,na.rm=T)) %>%
-                       mutate(eca = signif(eca, 3)) %>%
-                       ggplot() +
-                       geom_col(aes(year,eca, fill = type)) +
-                       theme_bw() +
-                       scale_y_continuous(n.breaks = 10) +
-                       scale_x_continuous(n.breaks = 10) +
-                       labs(x = "Year", y = "ECA (%)", title = "Simplified ECA")+
-                       scale_fill_manual(values = c("darkgreen","orange")),
-                     dynamicTicks = T, width = 800)
-            })
-
-        output$text_plot_eca <- renderText({
-          "<br><b> Equivalent Clearcut Area (ECA)</b> is a basin-wide statistic that is the sum of the total area of all forest disturbance
-          with a reduction factor that account for forest regeneration. ECA is expressed as a percentage of forest disturbance relative to
-          the total forested area of the watershed. The <b>Simplified ECA</b> is a quick calculation that assumes that all wildfires and cutblocks take 40 years to recover. The
-          Simplified ECA does not account for non-forested areas (e.g. alpine, lakes, ..), permanent forest disturbances (e.g. roads, pipelines, ..),
-          forest health factors (e.g. mountain pine beetle, etc.), or variable recovery rates based on site specific factors. This Simplified ECA
-          is not the same as ECA, and should not be misinterpreted as such. Read more about ECA: Winkler and Boone 2017 <a href='https://www.for.gov.bc.ca/hfd/pubs/Docs/En/En118.htm'>
-          Equivalent Clearcut Area as an Indicator of Hydrologic Change in Snow-dominated Watersheds of Southern British Columbia</a><br><br><br>"
-          })
+        if (nrow(my_cb) == 0) {my_cb <- st_as_sf(data.frame(clipped_area_m2 = 0,harvest_year = NA_integer_,elevation = 0,area_m2 = 0,lat = 0,long = 0,type = "cutblock"), coords = c("long", "lat"), crs = 3005)}
 
         output$plot_timeseries <- renderPlotly({
           ggplotly(
@@ -601,15 +499,8 @@ server <- function(input, output, session) {
               scale_fill_manual(values = c("darkgreen", "orange")) +
               scale_y_continuous(n.breaks = 10) +
               scale_x_continuous(n.breaks = 10),
-            dynamicTicks = T,width = 800)
-        })
-
-        output$text_plot_timeseries <- renderText({
-          "<br>The <b>Forest Disturbance History</b> is the total forest disturbance by year. Data is from the <a href='https://catalogue.data.gov.bc.ca/dataset/harvested-areas-of-bc-consolidated-cutblocks-'>
-          Consolidated Cutblocks</a> and <a href ='https://catalogue.data.gov.bc.ca/dataset/fire-perimeters-historical'>Wildfire Perimeter</a>. These datasets are frequently
-          updated. Some limitations of this data include: cutblocks do not include forest removal on private land, cutblocks are incosistently mapped before 1950, older wildfire polygons
-          are generally poorly mapped, and wildfire polygons generally do not account for unburned timber inside of the polygon.<br><br><br>"
-        })
+            dynamicTicks = T, width = 600, height = 300)
+          })
 
         output$plot_timeseries_cumsum <- renderPlotly({
           a <- bind_rows(
@@ -635,16 +526,8 @@ server <- function(input, output, session) {
               scale_fill_manual(values = c("darkgreen", "orange")) +
               scale_y_continuous(n.breaks = 10) +
               scale_x_continuous(n.breaks = 10),
-            dynamicTicks = T,width = 800)
+            dynamicTicks = T, width = 600, height = 300)
         })
-
-        output$text_plot_timeseries_cumsum <- renderText({
-          "<br>The <b>Cumulative Forest Disturbance History</b> is the total forest disturbance by year, accumulated over time. As such, it is possible to have a cumulative forest disturbance
-          that is greater than the total area of the watershed (i.e. > 100%). of Data is from the <a href='https://catalogue.data.gov.bc.ca/dataset/harvested-areas-of-bc-consolidated-cutblocks-'>
-          Consolidated Cutblocks</a> and <a href ='https://catalogue.data.gov.bc.ca/dataset/fire-perimeters-historical'>Wildfire Perimeter</a>. These datasets are frequently
-          updated. Some limitations of this data include: cutblocks do not include forest removal on private land, cutblocks are incosistently mapped before 1950, older wildfire polygons
-          are generally poorly mapped, and wildfire polygons generally do not account for unburned timber inside of the polygon.<br><br><br>"})
-
 
         # LAND COVER BY ELEVATION ####
         incProgress(1, detail = paste0("Getting Polygon Elevation"))
@@ -668,12 +551,8 @@ server <- function(input, output, session) {
               theme_bw() +
               coord_flip() +
               scale_fill_manual(values = c("darkgreen", "orange", "grey", "steelblue", "yellow")),
-            dynamicTicks = T, width = 800)
+            width = 600, height = 400, dynamicTicks = T)
         })
-
-        output$text_plot_elevbins <- renderText({
-          "<br>The <b>Centroid Elevation</b> is the elevation of the centroid of each polygon by type. The elevation source is the SRTM digital elevation model (circa 2000).
-          This only shows the centroid elevation and is not an accurate depiction of the rnage of elevations present in polygons over complex terrain. <br><br><br>"})
 
         # STREAM PROFILE ####
 
@@ -831,13 +710,9 @@ server <- function(input, output, session) {
                        geom_line(aes(dist_tot_m / 1000, Z, color = label)) +
                        theme_bw() +
                        labs(x = "Distance along stream km", y = "Elevation m a.s.l.", color = "Name", title = "Stream Profile") ,
-                     dynamicTicks = T,width = 800)
+              dynamicTicks = T, width = 600, height = 300)
           })
         }
-
-        output$text_plot_profile <- renderText({
-          "<br>The <b>Stream Profile</b> shows the elevation profile of the stream. The stream network is taken from the <a href='https://catalogue.data.gov.bc.ca/dataset/freshwater-atlas-stream-network'>
-          Freshwater Atlas</a>. The points that make up the stream network have elevation data built in. <br><br><br>"})
 
         # climate ####
         incProgress(1, detail = "Get climateBC")
@@ -899,20 +774,15 @@ server <- function(input, output, session) {
               filter(model %in% c("Historic", "13_GCMs")) %>%
               group_by(period, ssp, year) %>%
               dplyr::summarize(min = quantile(value, probs = 0.25, na.rm = T),
-                               mean = mean(value, na.rm = T),
-                               max = quantile(value, probs = 0.75, na.rm = T)) %>%
+                        mean = mean(value, na.rm = T),
+                        max = quantile(value, probs = 0.75, na.rm = T)) %>%
               ggplot() +
               geom_rect(aes(xmin = year - 14, xmax = year + 15, ymin = min, ymax = max, color = ssp, fill = ssp, group = period), alpha = 0.2) +
               labs(x = "Climate Normal Period", y = "Mean Annual Temperature") +
               theme_bw()
             ,
-            dynamicTicks = T,width = 800)
+            dynamicTicks = T, width = 600, height = 300)
         })
-
-        output$text_plot_mat <- renderText({
-          "<br>The <b>Mean Annual Temperature</b> shows the range of values from past climate normals and shows future projections under different scenarios. The
-          data source is <a href='https://climatebc.ca/'>ClimateBC</a>. <br><br><br>"})
-
         output$plot_map <- renderPlotly({
           ggplotly(
             climateBC_pts_dat %>%
@@ -920,18 +790,14 @@ server <- function(input, output, session) {
               filter(model %in% c("Historic", "13_GCMs")) %>%
               group_by(period, ssp, year) %>%
               dplyr::summarize(min = quantile(value, probs = 0.25, na.rm = T),
-                               mean = mean(value, na.rm = T),
-                               max = quantile(value, probs = 0.75, na.rm = T)) %>%
+                        mean = mean(value, na.rm = T),
+                        max = quantile(value, probs = 0.75, na.rm = T)) %>%
               ggplot() +
               geom_rect(aes(xmin = year - 14, xmax = year + 15, ymin = min, ymax = max, color = ssp, fill = ssp, group = period), alpha = 0.2) +
               labs(x = "Climate Normal Period", y = "Mean Annual Precipitation") +
               theme_bw(),
-            dynamicTicks = T,width = 800)
+            dynamicTicks = T, width = 600, height = 300)
         })
-        output$text_plot_map <- renderText({
-          "<br>The <b>Mean Annual Precipitation</b> shows the range of values from past climate normals and shows future projections under different scenarios. The
-          data source is <a href='https://climatebc.ca/'>ClimateBC</a>. <br><br><br>"})
-
         output$plot_cmd <-  renderPlotly({
           ggplotly(
             climateBC_pts_dat %>%
@@ -939,18 +805,15 @@ server <- function(input, output, session) {
               filter(model %in% c("Historic", "13_GCMs")) %>%
               group_by(period, ssp, year) %>%
               dplyr::summarize(min = quantile(value, probs = 0.25, na.rm = T),
-                               mean = mean(value, na.rm = T),
-                               max = quantile(value, probs = 0.75, na.rm = T)) %>%
+                        mean = mean(value, na.rm = T),
+                        max = quantile(value, probs = 0.75, na.rm = T)) %>%
               ggplot() +
               geom_rect(aes(xmin = year - 14, xmax = year + 15, ymin = min, ymax = max, color = ssp, fill = ssp, group = period), alpha = 0.2) +
               labs(x = "Climate Normal Period", y = "Cumulative Moisture Deficit") +
               theme_bw(),
-            dynamicTicks = T,width = 800)
+            dynamicTicks = T, width = 600, height = 300)
         })
 
-        output$text_plot_cmd <- renderText({
-          "<br>The <b>Cumulative Moisture Deficit</b> shows the range of values from past climate normals and shows future projections under different scenarios. The
-          data source is <a href='https://climatebc.ca/'>ClimateBC</a>. <br><br><br>"})
 
         # WATER ALLOCATIONS ####
         incProgress(1, detail = "Getting water allocations...")
@@ -965,72 +828,32 @@ server <- function(input, output, session) {
 
         if(nrow(wap)>0){
           wap <- wap %>%
-            filter(APPROVAL_STATUS %in% c("Current")) %>%
             st_transform(st_crs(new_ws2)) %>%
             st_intersection(new_ws2) %>%
             st_transform(4326) %>% mutate(lon = st_coordinates(.)[,1],
-                                          lat = st_coordinates(.)[,2]) %>% st_drop_geometry()}
-        if(nrow(wap)==0){
-          wap <- data.frame(lon = -111, lat = 55) %>% mutate(type = "test",
-                                                             QUANTITY = "",
-                                                             QUANTITY_UNITS = "",
-                                                             APPROVAL_STATUS = "",
-                                                             APPROVAL_TYPE = "") %>% filter(type != "test") }
+                                          lat = st_coordinates(.)[,2]) %>%
+            st_drop_geometry()
+          }else{
+            wap <- data.frame(lon = -111, lat = 55) %>% mutate(type = "test") %>%
+              filter(type != "test")
+            }
+
+        print("getting water alloc wrl")
 
         # WATER QUANTITY
-        print("getting water alloc wrl")
         wrl <- bcdc_query_geodata("water-rights-licences-public") %>%
           filter(INTERSECTS(new_ws2)) %>% select(POD_NUMBER, POD_SUBTYPE, POD_DIVERSION_TYPE, POD_STATUS,
-                                                 LICENCE_NUMBER, LICENCE_STATUS, LICENCE_STATUS_DATE, PRIORITY_DATE, PURPOSE_USE_CODE, PURPOSE_USE,
-                                                 QUANTITY, QUANTITY_UNITS, QUANTITY_FLAG, QUANTITY_FLAG_DESCRIPTION, QTY_DIVERSION_MAX_RATE, QTY_UNITS_DIVERSION_MAX_RATE, PRIMARY_LICENSEE_NAME) %>% collect()
+                         LICENCE_NUMBER, LICENCE_STATUS, LICENCE_STATUS_DATE, PRIORITY_DATE, PURPOSE_USE_CODE, PURPOSE_USE,
+                       QUANTITY, QUANTITY_UNITS, QUANTITY_FLAG, QUANTITY_FLAG_DESCRIPTION, QTY_DIVERSION_MAX_RATE, QTY_UNITS_DIVERSION_MAX_RATE, PRIMARY_LICENSEE_NAME) %>%collect()
         if(nrow(wrl)>0){
           wrl <- wrl %>%
             st_transform(st_crs(new_ws2)) %>%
-            filter(LICENCE_STATUS %in% "Current") %>%
             st_intersection(new_ws2) %>%
             st_transform(4326) %>% mutate(lon = st_coordinates(.)[,1],
-                                          lat = st_coordinates(.)[,2]) %>% st_drop_geometry()}
-        if(nrow(wrl)==0){
-          wrl <- data.frame(lon = -111, lat = 55)%>% mutate(type = "test",
-                                                            QUANTITY = "",
-                                                            QUANTITY_UNITS = "",
-                                                            LICENCE_STATUS = "",
-                                                            POD_SUBTYPE = "") %>% filter(type != "test")}
-
-        water_auth <-
-          bind_rows(wap %>% mutate(vol_units = str_split_fixed(QUANTITY_UNITS, "/", 2)[,1],
-                                   time_units = str_split_fixed(QUANTITY_UNITS, "/", 2)[,2],
-                                   total_vol_year = case_when(sub(" ","",time_units) == "sec" ~ as.numeric(QUANTITY) * 60 * 60 * 24 * 365,
-                                                              sub(" ","",time_units) == "day" ~ as.numeric(QUANTITY) * 365,
-                                                              sub(" ","",time_units) == "year" ~ as.numeric(QUANTITY),
-                                                              TRUE ~ 0)) %>%
-                      group_by(TYPE = APPROVAL_TYPE, STATUS = APPROVAL_STATUS) %>%
-                      st_drop_geometry() %>%
-                      summarise(SUM = sum(total_vol_year, na.rm = T)),
-                    wrl %>% mutate(vol_units = str_split_fixed(QUANTITY_UNITS, "/", 2)[,1],
-                                   time_units = str_split_fixed(QUANTITY_UNITS, "/", 2)[,2],
-                                   total_vol_year = case_when(sub(" ","",time_units) == "sec" ~ as.numeric(QUANTITY) * 60 * 60 * 24 * 365,
-                                                              sub(" ","",time_units) == "day" ~ as.numeric(QUANTITY) * 365,
-                                                              sub(" ","",time_units) == "year" ~ as.numeric(QUANTITY),
-                                                              TRUE ~ 0)) %>%
-                      group_by(TYPE = POD_SUBTYPE, STATUS = LICENCE_STATUS) %>%
-                      st_drop_geometry() %>%
-                      summarise(SUM = sum(total_vol_year, na.rm = T)))
-
-        output$plot_auth <-  renderPlotly({
-          ggplotly(
-            water_auth %>% ggplot() +
-              geom_col(aes(TYPE, SUM)) +
-              scale_y_continuous(labels = function(x) format(x, big.mark = ",", scientific = F)) +
-              labs(y = "Total Annual Water Allocation (cubic metres)", title = "Water Allocations") +
-              theme_bw(),
-            dynamicTicks = T, width = 800)
-          })
-
-        output$text_plot_auth <- renderText({
-          "<br>The <b>Water Allocations</b> shows the total annual water that has been allocated in the water-approval-points, and water-rights layers.
-              licenses have limited information on the timing of withdrawls. As such we assume water licenses are used to their full extent.
-              Allocation quantites in m^3/s are annualized."})
+                                          lat = st_coordinates(.)[,2]) %>%
+            st_drop_geometry()
+        }else{
+          wrl <- data.frame(lon = -111, lat = 55)%>% mutate(type = "test") %>% filter(type != "test")}
 
         # SATELLITE IMAGERY ####
         incProgress(1, detail = "Update Satellite Imagery")
@@ -1041,19 +864,19 @@ server <- function(input, output, session) {
           r1985 <- terra::rast("/vsicurl/https://bcbasin.s3.ca-central-1.amazonaws.com/1985_1990v3_COG_AV_JP_BIG.tif", win = terra::ext(new_ws2 %>% st_transform(4326)))
           plot(r1985, main = "Landsat 1985-1990", mar = 2)
           plot(v, add = T, border = "red", lwd = 2)
-        }, height = 800, width = 800)
+          }, height = 800, width = 800)
 
         output$plot_landsat_2020 <- renderPlot({
           r2020 <- terra::rast("/vsicurl/https://bcbasin.s3.ca-central-1.amazonaws.com/2020_2023v3_COG_AV_JP_BIG.tif", win = terra::ext(new_ws2 %>% st_transform(4326)))
           plot(r2020, main = "Landsat 2020-2023", mar = 2)
           plot(v, add = T, border = "red", lwd = 2)
-        }, height = 800, width = 800)
+          }, height = 800, width = 800)
 
         output$plot_sentinel_2023 <- renderPlot({
           r2023 <- terra::rast("/vsicurl/https://bcbasin.s3.ca-central-1.amazonaws.com/BC_2023v2_4326_v2_bigTiff_JPEG.tif", win = terra::ext(new_ws2 %>% st_transform(4326)))
           plot(r2023, main = "Sentinel Mosaic 2023", mar = 2)
           plot(v, add = T, border = "red", lwd = 2)
-        }, height = 800, width = 800)
+          }, height = 800, width = 800)
 
         # UPDATE LEAFLET ####
         incProgress(1, detail = "Update map")
@@ -1103,14 +926,14 @@ server <- function(input, output, session) {
                       labels = c("Water Approvals","Water Rights"),
                       title = "Points",
                       opacity = 1) %>%
-            addLegend("bottomright",
+          addLegend("bottomright",
                       colors = c("yellow","steelblue","grey","brown","blue","red","darkgreen"),
                       labels = c("FWA Wetland", "FWA Lake", "FWA Glacier","Glacier 1985","Glacier 2021","Wildfire","Cutblock"),
                       title = "Polygons",
                       opacity = 1)
-        })
+          })
 
-        # DOWNLOAD BUTTONS ####
+        ## DOWNLOAD BUTTONS ####
         output$downloadWatershed <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name),"_",new_ws2$gnis_id,"_watershed.sqlite")},content = function(file) {st_write(my_wl, file)})
         output$downloadCutblocks <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name),"_",new_ws2$gnis_id,"_cutblocks.sqlite")},content = function(file) {st_write(my_wl, file)})
         output$downloadWildfires <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name),"_",new_ws2$gnis_id,"_wildfires.sqlite")},content = function(file) {st_write(my_wl, file)})
@@ -1165,9 +988,8 @@ server <- function(input, output, session) {
     #     tableOutput('table_named')
     # })
 
+  })
   }
-    })
-}
 
 shinyApp(ui, server)
 
