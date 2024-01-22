@@ -228,7 +228,7 @@ wsc_estimate_cluster <- function(w = new_ws2,
       # geom_line(data = fasstr::calc_daily_stats(station_number = sample$STATION_NUMBER, complete_years = T), aes(DayofYear, Mean, color = "Measurement"), size = 1) +
       geom_hline(yintercept = new_ws_ltmad, color = "blue", size = 1) +
       # geom_hline(yintercept = sample$LTMAD, color = "black") +
-      labs(x = "Day", y = "Q", title = "Estimated Dischage for Selected Basin") +
+      labs(x = "Day", y = "Q", title = "Estimated Long Term Mean Daily Dischage for Selected Basin") +
       scale_color_manual(values = c("steelblue", "black")) +
       scale_fill_manual(values = c("grey90","grey70","grey50")) +
       # scale_y_log10() +
@@ -263,7 +263,7 @@ postgis_get_line <-
                  coords = c("lon", "lat"),
                  crs = 4326) %>% mutate(type = "test") %>% filter(type != "test")
     }
-    # DBI::dbDisconnect(conn)
+
     return(o)
   }
 
@@ -319,7 +319,7 @@ postgis_get_pol <-
                  coords = c("lon", "lat"),
                  crs = 4326) %>% mutate(type = "test") %>% filter(type != "test")
     }
-    # DBI::dbDisconnect(conn)
+
     return(o)
   }
 
@@ -387,8 +387,29 @@ ui <- navbarPage(
   title = "WatershedBC (v0.1 Beta Testing)",
   useShinyjs(),
 
+
   tabPanel(
     "WatershedBC (v0.1 Beta Testing)",
+
+    modalDialog(
+      h3("watershedBC in draft mode"),
+      HTML("Welcome to WatershedBC, a research tool that is in <u>active development</u> designed to aggregate watershed data and estimate streamflow. Before you proceed, please read and accept the following disclaimer:"),
+      HTML("<ul><br>
+        <li><b><u>Prototype:</u></b> watershedBC is a working prototype, there are known issues and innacuracies that we are actively fixing.</li><br>
+        <li><b><u>Not validated:</u></b> At this time, do not use any information from watershedBC for decision making.</li><br>
+        <li><b><u>Frequent outages:</u></b> This tool is a proof of concept and will periodically be offline, freeze, or crash.</li><br>
+        <li><b><u>User responsibility:</u></b> The User is responsible for the safe interpretation of the datasets presented.</li><br>
+        <li><b><u>Open source:</u></b> The goal of this project is to be openly transparent via <a href='https://github.com/bcgov/watershedBC/', target='_blank'>https://github.com/bcgov/watershedBC/</a></li><br>
+        <li><b><u>Speed:</u></b> This tool slows down with more concurent users. This will be fixed in future versions.</li><br>
+        <li><b><u>Feedback:</u></b> Users can provide feedback here: <a href='https://github.com/bcgov/watershedBC/issues/', target='_blank'>https://github.com/bcgov/watershedBC/issues/</a></li><br>
+        </ul> "),
+      title = "Disclaimer",
+      size = "l",
+      easyClose = FALSE,
+      footer = modalButton("I understand the disclaimer"),
+
+    ),
+
     fluidRow(
       column(
         width = 2,
@@ -417,16 +438,17 @@ ui <- navbarPage(
         actionButton(inputId = "zoom_to_button", label = "Zoom to.."),
         br(),
         br(),
-        HTML("<b>Map Options</b>"),
-        checkboxInput(inputId = "active_mouse", label = "Watershed Delineation ON", value = T),
+        # HTML("<b>Map Options</b>"),
+        # checkboxInput(inputId = "active_mouse", label = "Watershed Delineation ON", value = T, ),
         shiny::checkboxGroupInput(inputId = "run_modules",
-                                  label = "Include Modules",
+                                  label = "Include in Watershed Report",
           choices = c("Streamflow and Freshwater", "Forest Disturbance", "Stream Profile", "Water Allocations", "Climate BC", "Satellite Imagery"),
           selected = c("Streamflow and Freshwater", "Forest Disturbance"))),
 
       column(
         width = 10,
         leafletOutput("mymap", height = '600px') %>% withSpinner(color = "steelblue"),
+        checkboxInput(inputId = "active_mouse", label = "Watershed Delineation ON", value = T, ),
         h3(textOutput(outputId = "ws_selection")),
         actionButton(inputId = "run_button", label = "Run Report"),
         textOutput(outputId = "ws_run"),
@@ -467,9 +489,9 @@ ui <- navbarPage(
         downloadButton("downloadLakes", "FWA - Lakes"),
         downloadButton("downloadWetlands", "FWA - Wetlands"),
         downloadButton("downloadGlaciers", "FWA - Glaciers"),
-        downloadButton("downloadGlaciers85", "Glaciers 1985"),
-        downloadButton("downloadGlaciers21", "Glaciers 2021"),
-        downloadButton("downloadRoads", "Roads"),
+        # downloadButton("downloadGlaciers85", "Glaciers 1985"),
+        # downloadButton("downloadGlaciers21", "Glaciers 2021"),
+        # downloadButton("downloadRoads", "Roads"),
         br(),
         br(),
         br()
@@ -479,28 +501,11 @@ ui <- navbarPage(
     fluidRow(
       column(
         width = 12,
-        HTML(
-          "<b>Data sources:</b> Freshwater Atlas of BC, Consolidated Cutblocks of BC, BC Wildfire Service Fire Perimeters, Landsat, and Sentinel-2"
-        ),
-        br(),
-        HTML(
-          "<b>Known issues:</b> Data is not accurate across provincial, territorial, national borders."
-        ),
-        br(),
-        HTML(
-          "This tool is provided with <b>no guarantees of reliability or accuracy</b>, please scrutinize the results."
-        ),
-        br(),
-        HTML(
-          "Please contact <i>alexandre.bevington@gov.bc.ca</i> with any questions or comments about this tool."
-        ),
-        br(),
-        HTML(
-          "More info at: <a href='https://github.com/bcgov/watershedBC/'>https://github.com/bcgov/watershedBC/"
-        ),
-        br()
-      )
-    ),
+        HTML("<b>Data sources:</b> Freshwater Atlas of BC, Consolidated Cutblocks of BC, BC Wildfire Service Fire Perimeters, Landsat, and Sentinel-2"), br(),
+        HTML("<b>Known issues:</b> Data is not accurate across provincial, territorial, national borders."), br(),
+        HTML("This tool is provided with <b>no guarantees of reliability or accuracy</b>, please scrutinize the results."), br(),
+        HTML("Please contact <i>alexandre.bevington@gov.bc.ca</i> with any questions or comments about this tool."), br(),
+        HTML("More info at: <a href='https://github.com/bcgov/watershedBC/'>https://github.com/bcgov/watershedBC/"), br())),
 
     fluidRow(
       column(
@@ -513,28 +518,12 @@ ui <- navbarPage(
             style = "display:flex; justify-content:center; flex-direction:column; text-align:center; height:46px;",
             tags$ul(
               style = "display:flex; flex-direction:row; flex-wrap:wrap; margin:0; list-style:none; align-items:center; height:100%;",
-              tags$li(
-                a(href = "https://www2.gov.bc.ca/gov/content/home", "Home", style = "font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")
-              ),
-              tags$li(
-                a(href = "https://www2.gov.bc.ca/gov/content/home/disclaimer", "Disclaimer", style =
-                    "font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")
-              ),
-              tags$li(
-                a(href = "https://www2.gov.bc.ca/gov/content/home/privacy", "Privacy", style =
-                    "font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")
-              ),
-              tags$li(
-                a(href = "https://www2.gov.bc.ca/gov/content/home/accessibility", "Accessibility", style =
-                    "font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")
-              ),
-              tags$li(
-                a(href = "https://www2.gov.bc.ca/gov/content/home/copyright", "Copyright", style =
-                    "font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")
-              ),
-              tags$li(
-                a(href = "https://www2.gov.bc.ca/StaticWebResources/static/gov3/html/contact-us.html", "Contact", style =
-                    "font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")
+              tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home", "Home", style = "font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
+              tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/disclaimer", "Disclaimer", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
+              tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/privacy", "Privacy", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
+              tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/accessibility", "Accessibility", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
+              tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/copyright", "Copyright", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
+              tags$li(a(href = "https://www2.gov.bc.ca/StaticWebResources/static/gov3/html/contact-us.html", "Contact", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")
               )
             )
           )
@@ -550,6 +539,13 @@ server <- function(input, output, session) {
 
 
 
+
+  hide("downloadWatershed")
+  hide("downloadCutblocks")
+  hide("downloadWildfires")
+  hide("downloadWetlands")
+  hide("downloadLakes")
+  hide("downloadGlaciers")
 
   hide('table_named')
   hide("plot_discharge")
@@ -589,7 +585,7 @@ server <- function(input, output, session) {
 
   onStop(function() {
     cat("Closing Database  Connections")
-    # DBI::dbDisconnect(conn)
+
   })
 
   # BASEMAP
@@ -611,10 +607,10 @@ server <- function(input, output, session) {
           data = wsc_pp_ac,
           lng = wsc_pp_ac$lon,
           lat = wsc_pp_ac$lat,
-          color = "blue",
+          color = "steelblue",
           radius = 3,
           group = "WSC Active",
-          label = paste0(wsc_pp_ac$name, " - ", wsc_pp_ac$stationnum)
+          label = paste0(wsc_pp_ac$name, " - ", wsc_pp_ac$stationnum, " [active]")
         ) %>%
         addCircleMarkers(
           data = wsc_pp_dc,
@@ -623,9 +619,7 @@ server <- function(input, output, session) {
           color = "grey",
           radius = 3,
           group = "WSC Discontinued",
-          label = paste0(wsc_pp_dc$name, " - ", wsc_pp_dc$stationnum)
-        ) %>%
-        hideGroup("WSC Discontinued") %>%
+          label = paste0(wsc_pp_dc$name, " - ", wsc_pp_dc$stationnum, " [discontinued]")) %>%
         addLayersControl(
           baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap"),
           overlayGroups = c(
@@ -684,7 +678,7 @@ server <- function(input, output, session) {
                  ORDER BY area_m2 ASC LIMIT 1"
             )
           )
-          # DBI::dbDisconnect(conn)
+
           if (nrow(bas) > 0) {
             new_ws(bas %>% mutate(area_km2 = area_m2 / (1000 * 1000)))
           }
@@ -707,7 +701,7 @@ server <- function(input, output, session) {
             ORDER BY area_m2 ASC LIMIT 1"
               )
             )
-          # DBI::dbDisconnect(conn)
+
           bas <- bas %>% st_cast("POLYGON", warn = F)
           bas$overl <-
             bas %>% st_intersects(
@@ -741,7 +735,7 @@ server <- function(input, output, session) {
                  ORDER BY area_m2 ASC LIMIT 1"
             )
           )
-          # DBI::dbDisconnect(conn)
+
           if (nrow(bas) > 0) {
             new_ws(
               bas %>%
@@ -775,7 +769,7 @@ server <- function(input, output, session) {
               "'"
             )
           )
-          # DBI::dbDisconnect(conn)
+
 
           bas <- bas %>% rmapshaper::ms_simplify(keep = 0.8)
 
@@ -869,7 +863,7 @@ server <- function(input, output, session) {
             ),
             append = TRUE
           )
-          # DBI::dbDisconnect(conn)
+
 
         }
 
@@ -890,54 +884,18 @@ server <- function(input, output, session) {
         n <-
           st_read(conn,
                   query = paste0("SELECT * FROM fwa_named WHERE gnis_id = ", split_name))
-        # DBI::dbDisconnect(conn)
+
         new_ws(n %>% mutate(area_km2 = area_m2 / (1000 * 1000)))
-        output$ws_selection <-
-          renderText({
-            paste0(
-              "You selected ",
-              new_ws()$gnis_name,
-              " (",
-              format(round(
-                as.numeric(new_ws()$area_km2), 0
-              ), big.mark = ",") ,
-              " sq.km)"
-            )
-          })
-        output$ws_selection_pred_time <-
-          renderText({
-            paste0("Estimated time to run report ~ ",
-                   0.5 + round((new_ws()$area_km2 * 0.03) / 60, 1),
-                   " min")
-          })
+        output$ws_selection <- renderText({paste0("You selected ", new_ws()$gnis_name, " (", format(round(as.numeric(new_ws()$area_km2), 0), big.mark = ",") , " sq.km)")})
+        output$ws_selection_pred_time <- renderText({paste0("Estimated time to run report ~ ", 0.5 + round((new_ws()$area_km2 * 0.03) / 60, 1), " min")})
 
         bbbb <- st_bbox(n %>% st_transform(4326))
         output$mymap <- renderLeaflet({
-          initial_map %>%
-            addPolygons(
-              data = n %>% st_transform(4326),
-              fillOpacity = 0,
-              weight = 2,
-              color = "blue",
-              group = "Watershed"
-            ) %>%
-            addLayersControl(
-              baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap"),
-              overlayGroups = c(
-                "Sentinel 2023 (slow)",
-                "Landsat 2020-2023 (slow)",
-                "Landsat 1985-1990 (slow)",
-                "Watershed"
-              ),
-              options = layersControlOptions(collapsed = F)
-            ) %>%
-            hideGroup(
-              c(
-                "Sentinel 2023 (slow)",
-                "Landsat 1985-1990 (slow)",
-                "Landsat 2020-2023 (slow)"
-              )
-            ) %>%
+          initial_map %>% addPolygons(data = n %>% st_transform(4326), fillOpacity = 0, weight = 2, color = "blue", group = "Watershed") %>%
+            addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap"),
+                             overlayGroups = c("Sentinel 2023 (slow)", "Landsat 2020-2023 (slow)", "Landsat 1985-1990 (slow)", "Watershed"),
+                             options = layersControlOptions(collapsed = F)) %>%
+            hideGroup(c("Sentinel 2023 (slow)", "Landsat 1985-1990 (slow)", "Landsat 2020-2023 (slow)")) %>%
             fitBounds(bbbb$xmin[[1]], bbbb$ymin[[1]], bbbb$xmax[[1]], bbbb$ymax[[1]])
         })
       })
@@ -963,7 +921,7 @@ server <- function(input, output, session) {
         ),
         append = TRUE
       )
-      # DBI::dbDisconnect(conn)
+
 
 
     }
@@ -2253,7 +2211,7 @@ server <- function(input, output, session) {
                           action = "processing",
                           area_km2 = round(new_ws()$area_km2, 1),
                           basin_source = basin_source()), append = TRUE)
-  # DBI::dbDisconnect(conn)
+
 
         })
       }
