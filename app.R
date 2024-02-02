@@ -70,7 +70,13 @@ ui <- navbarPage(theme = "css/bcgov.css",
         actionButton(inputId = "zoom_to_button", label = "Zoom to.."),br(),br(),
         shiny::checkboxGroupInput(inputId = "run_modules",
                                   label = "Include in Watershed Report",
-                                  choices = c("Streamflow and Freshwater", "Forest Disturbance", "Stream Profile", "Water Allocations", "ClimateBC", "Satellite Imagery"),
+                                  choices = c("Streamflow and Freshwater",
+                                              "Forest Disturbance",
+                                              "CEF Human Disturbance - 2021",
+                                              "Stream Profile",
+                                              "Water Allocations",
+                                              "ClimateBC",
+                                              "Satellite Imagery"),
                                   selected = c("Streamflow and Freshwater"))),
       column(
         width = 10,
@@ -83,6 +89,8 @@ ui <- navbarPage(theme = "css/bcgov.css",
         tableOutput('table_named'),
         plotlyOutput("plot_discharge"), htmlOutput("text_plot_discharge"),
         plotlyOutput("plot_profile"), htmlOutput("text_plot_profile"),
+        plotlyOutput("plot_cef_group"),
+        plotlyOutput("plot_cef_group_flag"), htmlOutput("text_plot_cef_group_flag"),
         plotlyOutput("plot_timeseries"), htmlOutput("text_plot_timeseries"),
         plotlyOutput("plot_timeseries_cumsum"), htmlOutput("text_plot_timeseries_cumsum"),
         plotlyOutput("plot_eca"), htmlOutput("text_plot_eca"),
@@ -96,11 +104,12 @@ ui <- navbarPage(theme = "css/bcgov.css",
         plotOutput("plot_landsat_1985", width = 800, height = 800),
         plotOutput("plot_landsat_2020", width = 800, height = 800),
         plotOutput("plot_sentinel_2023", width = 800, height = 800),
-        downloadButton("downloadWatershed", "Watershed"),
-        downloadButton("downloadCutblocks", "Cutblocks"),
-        downloadButton("downloadWildfires", "Wildfire"),
-        downloadButton("downloadLakes", "FWA - Lakes"),
-        downloadButton("downloadWetlands", "FWA - Wetlands"),
+        downloadButton("export_pdf", "Export PDF"),br(),
+        downloadButton("downloadWatershed", "Watershed"),br(),
+        downloadButton("downloadCutblocks", "Cutblocks"),br(),
+        downloadButton("downloadWildfires", "Wildfire"),br(),
+        downloadButton("downloadLakes", "FWA - Lakes"),br(),
+        downloadButton("downloadWetlands", "FWA - Wetlands"),br(),
         downloadButton("downloadGlaciers", "FWA - Glaciers"),
         # downloadButton("downloadGlaciers85", "Glaciers 1985"),
         # downloadButton("downloadGlaciers21", "Glaciers 2021"),
@@ -134,43 +143,63 @@ ui <- navbarPage(theme = "css/bcgov.css",
 
 server <- function(input, output, session) {
 
+  # EXPORT PDF ####
+  output$export_pdf <- downloadHandler(
+    filename = "report.pdf",
+    content = function(file) {
+      tempReport <- file.path(tempdir(), "report.Rmd")
+      file.copy("report.Rmd", tempReport, overwrite = TRUE)
+      params <- list(n = 12)
+      rmarkdown::render(output_yaml = tempReport,
+                        output_file = "report.pdf",
+                        params = params,
+                        envir = new.env(parent = globalenv())
+      )
+    }
+  )
+
   ## HIDE PLOTS ON START
 
-    hide("downloadWatershed")
-    hide("downloadCutblocks")
-    hide("downloadWildfires")
-    hide("downloadWetlands")
-    hide("downloadLakes")
-    hide("downloadGlaciers")
+    shinyjs::hide("export_pdf")
+    shinyjs::hide("downloadWatershed")
+    shinyjs::hide("downloadCutblocks")
+    shinyjs::hide("downloadWildfires")
+    shinyjs::hide("downloadWetlands")
+    shinyjs::hide("downloadLakes")
+    shinyjs::hide("downloadGlaciers")
 
-    hide('table_named')
-    hide("plot_discharge")
-    hide("text_plot_discharge")
-    hide("plot_profile")
-    hide("text_plot_profile")
-    hide("plot_timeseries")
-    hide("text_plot_timeseries")
-    hide("plot_timeseries_cumsum")
-    hide("text_plot_timeseries_cumsum")
-    hide("plot_eca")
-    hide("text_plot_eca")
-    hide("plot_elevbins")
-    hide("text_plot_elevbins")
-    hide("plot_fwa")
-    hide("text_plot_fwa")
-    hide("plot_auth")
-    hide("text_plot_auth")
-    hide("plot_dra")
-    hide("text_plot_dra")
-    hide("plot_mat")
-    hide("text_plot_mat")
-    hide("plot_map")
-    hide("text_plot_map")
-    hide("plot_cmd")
-    hide("text_plot_cmd")
-    hide("plot_landsat_1985")
-    hide("plot_landsat_2020")
-    hide("plot_sentinel_2023")
+    shinyjs::hide('table_named')
+    shinyjs::hide("plot_discharge")
+    shinyjs::hide("text_plot_discharge")
+    shinyjs::hide("plot_profile")
+    shinyjs::hide("text_plot_profile")
+    shinyjs::hide("plot_cef_group")
+    shinyjs::hide("text_plot_cef_group")
+    shinyjs::hide("plot_cef_group_flag")
+    shinyjs::hide("text_plot_cef_group_flag")
+    shinyjs::hide("plot_timeseries")
+    shinyjs::hide("text_plot_timeseries")
+    shinyjs::hide("plot_timeseries_cumsum")
+    shinyjs::hide("text_plot_timeseries_cumsum")
+    shinyjs::hide("plot_eca")
+    shinyjs::hide("text_plot_eca")
+    shinyjs::hide("plot_elevbins")
+    shinyjs::hide("text_plot_elevbins")
+    shinyjs::hide("plot_fwa")
+    shinyjs::hide("text_plot_fwa")
+    shinyjs::hide("plot_auth")
+    shinyjs::hide("text_plot_auth")
+    shinyjs::hide("plot_dra")
+    shinyjs::hide("text_plot_dra")
+    shinyjs::hide("plot_mat")
+    shinyjs::hide("text_plot_mat")
+    shinyjs::hide("plot_map")
+    shinyjs::hide("text_plot_map")
+    shinyjs::hide("plot_cmd")
+    shinyjs::hide("text_plot_cmd")
+    shinyjs::hide("plot_landsat_1985")
+    shinyjs::hide("plot_landsat_2020")
+    shinyjs::hide("plot_sentinel_2023")
 
   ## RECORD SESSION INFO
 
@@ -384,34 +413,38 @@ server <- function(input, output, session) {
 
   observeEvent(input$run_button, {
 
-    hide('table_named')
-    hide("plot_discharge")
-    hide("text_plot_discharge")
-    hide("plot_profile")
-    hide("text_plot_profile")
-    hide("plot_timeseries")
-    hide("text_plot_timeseries")
-    hide("plot_timeseries_cumsum")
-    hide("text_plot_timeseries_cumsum")
-    hide("plot_eca")
-    hide("text_plot_eca")
-    hide("plot_elevbins")
-    hide("text_plot_elevbins")
-    hide("plot_fwa")
-    hide("text_plot_fwa")
-    hide("plot_auth")
-    hide("text_plot_auth")
-    hide("plot_dra")
-    hide("text_plot_dra")
-    hide("plot_mat")
-    hide("text_plot_mat")
-    hide("plot_map")
-    hide("text_plot_map")
-    hide("plot_cmd")
-    hide("text_plot_cmd")
-    hide("plot_landsat_1985")
-    hide("plot_landsat_2020")
-    hide("plot_sentinel_2023")
+    shinyjs::hide('table_named')
+    shinyjs::hide("plot_discharge")
+    shinyjs::hide("text_plot_discharge")
+    shinyjs::hide("plot_profile")
+    shinyjs::hide("text_plot_profile")
+    shinyjs::hide("plot_cef_group")
+    shinyjs::hide("text_plot_cef_group")
+    shinyjs::hide("plot_cef_group_flag")
+    shinyjs::hide("text_plot_cef_group_flag")
+    shinyjs::hide("plot_timeseries")
+    shinyjs::hide("text_plot_timeseries")
+    shinyjs::hide("plot_timeseries_cumsum")
+    shinyjs::hide("text_plot_timeseries_cumsum")
+    shinyjs::hide("plot_eca")
+    shinyjs::hide("text_plot_eca")
+    shinyjs::hide("plot_elevbins")
+    shinyjs::hide("text_plot_elevbins")
+    shinyjs::hide("plot_fwa")
+    shinyjs::hide("text_plot_fwa")
+    shinyjs::hide("plot_auth")
+    shinyjs::hide("text_plot_auth")
+    shinyjs::hide("plot_dra")
+    shinyjs::hide("text_plot_dra")
+    shinyjs::hide("plot_mat")
+    shinyjs::hide("text_plot_mat")
+    shinyjs::hide("plot_map")
+    shinyjs::hide("text_plot_map")
+    shinyjs::hide("plot_cmd")
+    shinyjs::hide("text_plot_cmd")
+    shinyjs::hide("plot_landsat_1985")
+    shinyjs::hide("plot_landsat_2020")
+    shinyjs::hide("plot_sentinel_2023")
 
     if(!is.null(new_ws())){
 
@@ -420,7 +453,7 @@ server <- function(input, output, session) {
       new_ws2 <- new_ws()
       print(new_ws2)
       # new_ws2 <- bas
-      # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Robson River'") %>% mutate(area_km2 = area_m2/(1000*1000))
+      # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Stony Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
       # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'McMillan Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
       # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Joe Smith Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
       # new_ws2 <- st_read(refresh(), query = "SELECT * FROM fwa_named WHERE gnis_id = 26413") %>% mutate(area_km2 = area_m2/(1000*1000))
@@ -436,13 +469,16 @@ server <- function(input, output, session) {
 
   withProgress(message = 'Processing...', max = 15,  {
 
+
+
+
 # FRESHWATER ####
 
   if("Streamflow and Freshwater" %in% input$run_modules) {
 
     ## NAMED WATERSHEDS ####
 
-    show('table_named')
+    shinyjs::show('table_named')
     incProgress(1, detail = paste0("Get watersheds (", round(new_ws2$area_km2, 0), ")"))
     print("getting watershed")
     my_named <- postgis_get_pol("fwa_named","*",elev = F,my_wkt = new_ws2_wkt,min_area_km2 = new_ws2$area_km2 * 0.1)
@@ -463,9 +499,31 @@ server <- function(input, output, session) {
                Area_km2 = area_km2)
       ,digits = 2)}
 
+
+    # Human <- c("Agriculture_and_Clearing",
+    #            "BTM - Range Lands",
+    #            "Mining_and_Extraction",
+    #            "OGC_Infrastructure",
+    #            "OGC_Geophysical",
+    #            "Power",
+    #            "Rail_and_Infrastructure")
+    # Forest <- c("BTM - Forest Land",
+    #             "Cutblocks",
+    #             "Recreation",
+    #             "RESULTS_Reserves",
+    #             "ROW",
+    #             "Urban")
+    # Nonforest <- c("BTM - Alpine SubAlpine Barren",
+    #                "BTM - Fresh Water",
+    #                "BTM - Glaciers and Snow",
+    #                "BTM - Salt Water",
+    #                "BTM - Shrubs",
+    #                "BTM - Wetlands Estuaries",
+    #                "")
+
   # FRESHWATER RESOURCES ####
 
-    show("plot_fwa")
+    shinyjs::show("plot_fwa")
 
     incProgress(1, detail = "Get Wetlands")
     print("getting wetlands")
@@ -518,14 +576,14 @@ server <- function(input, output, session) {
                    scale_fill_manual(values = c("grey90", "grey80", "grey70", "steelblue", "yellow")) +
                    scale_y_continuous(n.breaks = 10), dynamicTicks = T, width = 800)
       })
-    }else{hide("plot_fwa")}
+    }else{shinyjs::hide("plot_fwa")}
 
 # DISCHAGE ####
 
     if ("Streamflow and Freshwater" %in% input$run_modules) {
 
-      show("plot_discharge")
-      show("text_plot_discharge")
+      shinyjs::show("plot_discharge")
+      shinyjs::show("text_plot_discharge")
 
       incProgress(1, detail = "Estimating discharge...")
       print("getting discharge")
@@ -543,24 +601,24 @@ server <- function(input, output, session) {
       output$text_plot_discharge <- renderText({"<br>The <b>Estimated Discharge</b> is a first working prototype that has <b>NOT BEEN VALIDATED</b>. Please do not use this information for decision making at this time. The model classifies existing Water Survey of Canada stations into 21 groups based on the similarity of their annual flow distributions, then a linear Basin Area / LTMAD relationship is built for each group. Then a second model uses basin statistics (ClimateBC, Terrain and Freshwater Atlas) to determin which group an ungauged basin should belong to, and scales the flow distribution to the size of the basin. This dataset has <b>KNOWN PROBLEMS</b> that we are actively fixing. In order to inspect how well the model performs, use the Water Survey of Canada basins, the plot will then show the model vs the actual station data.<br><br><br>"})
 
     }else{
-      hide("plot_discharge")
-      hide("textplot_discharge")
+      shinyjs::hide("plot_discharge")
+      shinyjs::hide("textplot_discharge")
       }
 
 # FOREST DISTURBANCE ####
 
   if("Forest Disturbance" %in% input$run_modules) {
 
-    show("plot_dra")
-    show("text_plot_dra")
-    show("plot_eca")
-    show("text_plot_eca")
-    show("plot_timeseries")
-    show("text_plot_timeseries")
-    show("plot_timeseries_cumsum")
-    show("text_plot_timeseries_cumsum")
-    show("plot_elevbins")
-    show("text_plot_elevbins")
+    shinyjs::show("plot_dra")
+    shinyjs::show("text_plot_dra")
+    shinyjs::show("plot_eca")
+    shinyjs::show("text_plot_eca")
+    shinyjs::show("plot_timeseries")
+    shinyjs::show("text_plot_timeseries")
+    shinyjs::show("plot_timeseries_cumsum")
+    shinyjs::show("text_plot_timeseries_cumsum")
+    shinyjs::show("plot_elevbins")
+    shinyjs::show("text_plot_elevbins")
 
     # ROADS ####
 
@@ -571,6 +629,7 @@ server <- function(input, output, session) {
     if (nrow(dra) > 0) {
       dra <- dra  %>% st_make_valid() %>% mutate(length_km = as.numeric(st_length(.)) / 1000) %>% mutate(type = "dra", group = transport_line_surface_code_desc)
         }else{dra <- st_as_sf(data.frame(lon = -111, lat = 55, length_km = 0), coords = c("lon", "lat"), crs = 4326) %>% mutate(type = "test", group = "test") %>% filter(type != "test")}
+
 
     output$plot_dra <- renderPlotly({
             ggplotly(
@@ -584,7 +643,7 @@ server <- function(input, output, session) {
                 labs(
                   x = "",
                   y = "Length km",
-                  title = "Total Road Length",
+                  title = paste0("Total Road Length ", round(dra$length_km %>% sum(), 1), " km"),
                   fill = ""
                 ) +
                 scale_y_continuous(n.breaks = 10)
@@ -595,8 +654,8 @@ server <- function(input, output, session) {
           })
 
           output$text_plot_dra <- renderText({
-            "<br><b>Total Road Length</b> is the total distance of roads in the <a href='https://www2.gov.bc.ca/gov/content/data/geographic-data-services/topographic-data/roads'>
-          Digital Road Atlas</a> of BC.<br><br><br>"
+            paste0("<br><b>Total Road Length: ", round(dra$length_km %>% sum(), 1), " km</b>. Roads are calculated from the <a href='https://www2.gov.bc.ca/gov/content/data/geographic-data-services/topographic-data/roads'>
+          Digital Road Atlas</a> of BC.<br><br><br>")
           })
 
           # FORESTS ####
@@ -864,25 +923,90 @@ server <- function(input, output, session) {
           })
 
   }else{
-    hide("plot_dra")
-    hide("text_plot_dra")
-    hide("plot_eca")
-    hide("text_plot_eca")
-    hide("plot_timeseries")
-    hide("text_plot_timeseries")
-    hide("plot_timeseries_cumsum")
-    hide("text_plot_timeseries_cumsum")
-    hide("plot_elevbins")
-    hide("text_plot_elevbins")
+    shinyjs::hide("plot_dra")
+    shinyjs::hide("text_plot_dra")
+    shinyjs::hide("plot_eca")
+    shinyjs::hide("text_plot_eca")
+    shinyjs::hide("plot_timeseries")
+    shinyjs::hide("text_plot_timeseries")
+    shinyjs::hide("plot_timeseries_cumsum")
+    shinyjs::hide("text_plot_timeseries_cumsum")
+    shinyjs::hide("plot_elevbins")
+    shinyjs::hide("text_plot_elevbins")
   }
+
+  # CUMULATIVE EFFECTS ####
+
+    if("CEF Human Disturbance - 2021" %in% input$run_modules) {
+
+      incProgress(1, detail = paste0("Get Cumulative Effects"))
+
+      shinyjs::show("plot_cef_group")
+      shinyjs::show("text_plot_cef_group")
+      shinyjs::show("plot_cef_group_flag")
+      shinyjs::show("text_plot_cef_group_flag")
+
+      bc_cef_2021 <- postgis_get_pol("bc_cef_2021", "*", my_wkt = new_ws2_wkt, elev = F)
+
+      bc_cef_2021_sum <- bc_cef_2021 %>% mutate(area_km22 = as.numeric(st_area(.))/(1000*1000)) %>%
+        st_drop_geometry() %>%
+        group_by(cef_disturb_group, cef_human_disturb_flag) %>%
+        summarize(area = sum(area_km22))
+
+      cef_sum <- plot_ly(bc_cef_2021_sum,
+                          labels = ~paste0(gsub("_", " ", gsub("BTM - ", "", cef_disturb_group))),
+                          values = ~area,
+                          type = 'pie',
+                          hole = 0.6,
+                          width = 800,
+                          textinfo = 'percent',
+                          hoverinfo = 'text',
+                          text = ~paste0(cef_human_disturb_flag, "\n", cef_disturb_group, "\n", round(area,1), ' sq. km'),
+                          showlegend = T) %>%
+        layout(title = 'Human Disturbance - 2021 - By group - % of total watershed area',
+               xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+               yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+
+      bc_cef_2021_sum_flag <- bc_cef_2021 %>% mutate(area_km22 = as.numeric(st_area(.))/(1000*1000)) %>%
+        st_drop_geometry() %>%
+        group_by(cef_human_disturb_flag) %>%
+        summarize(area = sum(area_km22))
+
+      cef_sum_flag <- plot_ly(bc_cef_2021_sum_flag,
+                               labels = ~paste0(gsub("_", " ", gsub("BTM - ", "", cef_human_disturb_flag))),
+                               values = ~area,
+                               type = 'pie',
+                               hole = 0.6,
+                               width = 800,
+                               textinfo = 'percent',
+                               hoverinfo = 'text',
+                               text = ~paste0(cef_human_disturb_flag, "\n", round(area,1), ' sq. km'),
+                               showlegend = T) %>%
+          layout(title = 'Human Disturbance - 2021 - Summarized - % of total watershed area',
+                 xaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE),
+                 yaxis = list(showgrid = FALSE, zeroline = FALSE, showticklabels = FALSE))
+
+      output$plot_cef_group <- renderPlotly({cef_sum})
+      output$plot_cef_group_flag <- renderPlotly({cef_sum_flag})
+
+
+      output$text_plot_cef_group <- renderText({
+        "<br>The <b>Cumulative Effects Framework - Human Disturbance - 2021</b> is a consolidated human disturbance footprint data set for
+        provincial-scale spatial assessment to support
+        <a href = 'https://www2.gov.bc.ca/gov/content/environment/natural-resource-stewardship/cumulative-effects-framework'', target = '_blank'>Cumulative Effects Framework (CEF)</a> analysis. The dataset is publicly available in the
+        <a href = 'https://catalogue.data.gov.bc.ca/dataset/ce-disturbance-2021/', target = '_blank'>BC Data Catalogue</a>. <br><br><br>"
+      })
+
+
+    }
 
 
 # STREAM PROFILE ####
 
   if("Stream Profile" %in% input$run_modules) {
 
-    show("plot_profile")
-    show("text_plot_profile")
+    shinyjs::show("plot_profile")
+    shinyjs::show("text_plot_profile")
 
     incProgress(1, detail = paste0("Getting Stream Profile"))
     print("getting profile")
@@ -1058,20 +1182,20 @@ server <- function(input, output, session) {
           })
 
   }else{
-    hide("plot_profile")
-    hide("text_plot_profile")
+    shinyjs::hide("plot_profile")
+    shinyjs::hide("text_plot_profile")
   }
 
 # climate ####
 
   if ("ClimateBC" %in% input$run_modules) {
 
-    show("plot_mad")
-    show("text_plot_mad")
-    show("plot_map")
-    show("text_plot_map")
-    show("plot_cmd")
-    show("text_plot_cmd")
+    shinyjs::show("plot_mad")
+    shinyjs::show("text_plot_mad")
+    shinyjs::show("plot_map")
+    shinyjs::show("text_plot_map")
+    shinyjs::show("plot_cmd")
+    shinyjs::show("text_plot_cmd")
 
     incProgress(1, detail = "Get climateBC")
 
@@ -1225,12 +1349,12 @@ server <- function(input, output, session) {
           data source is <a href='https://climatebc.ca/'>ClimateBC</a>. <br><br><br>"
           })
   }else{
-    hide("plot_mad")
-    hide("text_plot_mad")
-    hide("plot_map")
-    hide("text_plot_map")
-    hide("plot_cmd")
-    hide("text_plot_cmd")
+    shinyjs::hide("plot_mad")
+    shinyjs::hide("text_plot_mad")
+    shinyjs::hide("plot_map")
+    shinyjs::hide("text_plot_map")
+    shinyjs::hide("plot_cmd")
+    shinyjs::hide("text_plot_cmd")
 
   }
 
@@ -1240,8 +1364,8 @@ server <- function(input, output, session) {
 
   if ("Water Allocations" %in% input$run_modules) {
 
-    show("plot_auth")
-    show("text_plot_auth")
+    shinyjs::show("plot_auth")
+    shinyjs::show("text_plot_auth")
 
     incProgress(1, detail = "Getting water allocations...")
     print("getting water alloc wap")
@@ -1372,16 +1496,16 @@ server <- function(input, output, session) {
               Allocation quantites in m^3/s are annualized."
           })
   }else{
-    hide("plot_auth")
-    hide("text_plot_auth")}
+    shinyjs::hide("plot_auth")
+    shinyjs::hide("text_plot_auth")}
 
 # SATELLITE IMAGERY ####
 
   if ("Satellite Imagery" %in% input$run_modules) {
 
-    show("plot_landsat_1985")
-    show("plot_landsat_2020")
-    show("plot_sentinel_2023")
+    shinyjs::show("plot_landsat_1985")
+    shinyjs::show("plot_landsat_2020")
+    shinyjs::show("plot_sentinel_2023")
 
     incProgress(1, detail = "Update Satellite Imagery")
 
@@ -1403,9 +1527,9 @@ server <- function(input, output, session) {
             plot(v, add = T, border = "red", lwd = 2)}, height = 800, width = 800)
 
     }else{
-      hide("plot_landsat_1985")
-      hide("plot_landsat_2020")
-      hide("plot_sentinel_2023")}
+      shinyjs::hide("plot_landsat_1985")
+      shinyjs::hide("plot_landsat_2020")
+      shinyjs::hide("plot_sentinel_2023")}
 
 # UPDATE LEAFLET ####
 
@@ -1415,11 +1539,19 @@ server <- function(input, output, session) {
 
 
     new_leaflet <- initial_map
+
     if("Forest Disturbance" %in% input$run_modules){
       new_leaflet <- new_leaflet %>%
         addPolylines(data = dra %>% st_transform(4326), group = "Roads", fillColor = "black", color = "black", weight = 1, fillOpacity = 1, label = dra$transport_line_surface_code_desc) %>%
         addPolygons(data = my_wf %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Fire", fillColor = "red", color = "red", weight = 2, opacity = 1, fillOpacity = 0.3, label = paste0("Fire year:", my_wf$fire_year)) %>%
         addPolygons(data = my_cb %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Cutblock", fillColor = "darkgreen", color = "darkgreen", weight = 1, fillOpacity = 0.3, label = paste("Harvest year:", my_cb$harvest_year))}
+
+    # if("CEF Human Disturbance - 2021" %in% input$run_modules){
+    #   new_leaflet <- new_leaflet %>%
+    #     addPolygons(data = bc_cef_2021 %>% filter(cef_human_disturb_flag == "Natural Landbase") %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Fire", fillColor = "red", color = "red", weight = 2, opacity = 1, fillOpacity = 0.3, label = paste0("Fire year:", my_wf$fire_year)) %>%
+    #     addPolygons(data = my_cb %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Cutblock", fillColor = "darkgreen", color = "darkgreen", weight = 1, fillOpacity = 0.3, label = paste("Harvest year:", my_cb$harvest_year))}
+    #
+    # bc_cef_2021
 
     if("Water Allocations" %in% input$run_modules){
       new_leaflet <- new_leaflet %>%
@@ -1486,6 +1618,8 @@ server <- function(input, output, session) {
   time <- paste0(round(as.numeric(as.numeric(strsplit(toc()$callback_msg, " ")[[1]][1]) / 60), 1), " minutes elapsed")
   output$ws_run <- renderText({time})
   output$ws_selection_pred_time <- renderText({"Processing complete!"})
+
+  # shinyjs::show('export_pdf')
 
   # conn <- refresh()
   dbWriteTable(conn, "usage",
