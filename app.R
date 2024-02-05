@@ -17,11 +17,12 @@
 # FUNCTIONS ####################################################################
 
   # source("app_4_discharge.R")
-  source("app_4_discharge_matchStn.R")
+  # source("app_4_discharge_matchStn.R")
+  source("app_4_discharge_matchStn_forceUpdate.R")
 
 # BASEMAP ######################################################################
 
-source("app_5_leaflet.R")
+  source("app_5_leaflet.R")
 
 # UI ###########################################################################
 
@@ -94,7 +95,12 @@ ui <- navbarPage(theme = "css/bcgov.css",
                               textOutput(outputId = "ws_run"),
                               textOutput(outputId = "ws_selection_pred_time"),
                               tableOutput('table_named'),
-                              plotlyOutput("plot_discharge"), htmlOutput("text_plot_discharge"),
+                              plotlyOutput("plot_discharge"),
+                              shiny::selectInput(inputId = "plot_discharge_site_sel",
+                                                        label = "Override Reference Station for Streamflow Estimation",
+                                                        choices = stn_training$total_name,
+                                                        width = "500px"),
+                              htmlOutput("text_plot_discharge"),
                               plotlyOutput("plot_profile"), htmlOutput("text_plot_profile"),
                               plotlyOutput("plot_cef_group"),
                               plotlyOutput("plot_cef_group_flag"), htmlOutput("text_plot_cef_group_flag"),
@@ -126,10 +132,10 @@ ui <- navbarPage(theme = "css/bcgov.css",
                           shiny::fluidRow(
                             shiny::column(
                               width = 12,
-                              HTML("<b>More info:</b> <a href='https://github.com/bcgov/watershedBC/', target='_blank'>https://github.com/bcgov/watershedBC/</a><br><br>
-              <b>Data sources:</b> Freshwater Atlas of BC, Consolidated Cutblocks of BC, BC Wildfire Service Fire Perimeters, Landsat, and Sentinel-2<br><br>
-              <b>Known issues:</b> Data is not accurate across provincial, territorial, national borders.<br><br>
-              This tool is provided with <b>no guarantees of reliability or accuracy</b>, please scrutinize the results.<br><br>
+                              HTML("<b>More info:</b> <a href='https://github.com/bcgov/watershedBC/', target='_blank'>https://github.com/bcgov/watershedBC/</a><br>
+              <b>Data sources:</b> Freshwater Atlas of BC, Consolidated Cutblocks of BC, BC Wildfire Service Fire Perimeters, Landsat, and Sentinel-2<br>
+              <b>Known issues:</b> Data is not accurate across provincial, territorial, national borders.<br>
+              This tool is provided with <b>no guarantees of reliability or accuracy</b>, please scrutinize the results.<br>
               Please contact <i>alexandre.bevington@gov.bc.ca</i> with any questions or comments about this tool."), br())),
 
                           shiny::fluidRow(
@@ -165,6 +171,7 @@ server <- function(input, output, session) {
   shinyjs::hide("downloadRoads")
   shinyjs::hide('table_named')
   shinyjs::hide("plot_discharge")
+  shinyjs::hide("plot_discharge_site_sel")
   shinyjs::hide("text_plot_discharge")
   shinyjs::hide("plot_profile")
   shinyjs::hide("text_plot_profile")
@@ -203,6 +210,7 @@ server <- function(input, output, session) {
   ## CREATE REACTIVE VAL FOR WATERSHED
   new_ws <- reactiveVal()
   basin_source <- reactiveVal()
+  new_ws2_forRF <- reactiveVal()
 
   ## ADD INITAL BASEMAP
   output$mymap <- renderLeaflet({initial_map %>% fitBounds(-140, 48, -113, 60)})
@@ -248,7 +256,7 @@ server <- function(input, output, session) {
         point <- input$mymap_click
         point_df <- data.frame(lat = point$lat, lng = point$lng)
         print(paste0("point_df <- data.frame(lat = ",point$lat,", lng = ",point$lng,")"))
-        # point_df <- data.frame(lat = 55.08194, lng = -122.9131)
+        # point_df <- data.frame(lat = 53.1204052831066, lng = -124.937831245044)
 
         # SELECT WATERSHED FROM ONE OF THESE OPTIONS
 
@@ -410,7 +418,28 @@ server <- function(input, output, session) {
 
 
   # RUN REPORT #################################################################
+  observeEvent(input$plot_discharge_site_sel,
+               {
+                 withProgress(message = 'Update Reference Station...', max = 2,  {
+                   my_force_station <- str_split_fixed(input$plot_discharge_site_sel, " - ", 3)[,1]
+                   # new_ws2_forRF(pred_Q_prepWS(w = new_ws2, my_wetlands = my_wl, my_glaciers = my_gl, my_lakes = my_lk))
 
+                   if(input$watershed_source == "Water Survey of Canada Basins"){
+                     print(new_ws2$gnis_id)
+                     output$plot_discharge <- renderPlotly({
+                       # ref_stn <- pred_Q_findRef()
+                       pred_Q_rf(w = new_ws2_forRF(), force_station = my_force_station, wsc_STATION_NUMBER = new_ws2$gnis_id)
+                     })
+                   }else{
+                     output$plot_discharge <- renderPlotly({
+                       print("update2")
+                       print(new_ws2_forRF())
+                       # ref_stn <- pred_Q_findRef()
+                       pred_Q_rf(w = new_ws2_forRF(), force_station = my_force_station)
+                     })
+                   }
+                 })
+               })
   observeEvent(input$run_button, {
 
     shinyjs::hide('table_named')
@@ -564,27 +593,41 @@ server <- function(input, output, session) {
             mutate(regulated_percent = 100*(total_licence_storage/1e9)/area_km2) %>%
             mutate(regulated = case_when(regulated_percent > 0.003 ~ "regulated", TRUE ~ "unregulated"))
 
-          # DISCHARGE ####
+# DISCHARGE ####
 
-          if ("Streamflow and Freshwater" %in% input$run_modules) {
+  if ("Streamflow and Freshwater" %in% input$run_modules) {
 
-            shinyjs::show("plot_discharge")
-            shinyjs::show("text_plot_discharge")
+    incProgress(1, detail = "Estimating discharge...")
+    print("getting discharge")
 
-            incProgress(1, detail = "Estimating discharge...")
-            print("getting discharge")
-
+    new_ws2_forRF(pred_Q_prepWS(w = new_ws2, my_wetlands = my_wl, my_glaciers = my_gl, my_lakes = my_lk))
+    print(new_ws2_forRF())
+    ref_stn <- pred_Q_findRef(w = new_ws2_forRF())
+    print("REFFF")
+    print(ref_stn)
             if(input$watershed_source == "Water Survey of Canada Basins"){
+              print("WSC")
               print(new_ws2$gnis_id)
               output$plot_discharge <- renderPlotly({
-                wsc_estimate_cluster(w = new_ws2, my_wetlands = my_wl, my_glaciers = my_gl, my_lakes = my_lk, my_STATION_NUMBER = new_ws2$gnis_id)
+                pred_Q_rf(w = new_ws2_forRF(), force_station = ref_stn, wsc_STATION_NUMBER = new_ws2$gnis_id)
               })
             }else{
               output$plot_discharge <- renderPlotly({
-                wsc_estimate_cluster(w = new_ws2, my_wetlands = my_wl, my_glaciers = my_gl, my_lakes = my_lk)
+                print("other")
+                pred_Q_rf(w = new_ws2_forRF(), force_station = ref_stn)
               })
             }
-            output$text_plot_discharge <- renderText({"<br>The <b>Estimated Discharge</b> is a first working prototype that has <b>NOT BEEN VALIDATED</b>. Please do not use this information for decision making at this time. The model classifies existing Water Survey of Canada stations into 21 groups based on the similarity of their annual flow distributions, then a linear Basin Area / LTMAD relationship is built for each group. Then a second model uses basin statistics (ClimateBC, Terrain and Freshwater Atlas) to determin which group an ungauged basin should belong to, and scales the flow distribution to the size of the basin. This dataset has <b>KNOWN PROBLEMS</b> that we are actively fixing. In order to inspect how well the model performs, use the Water Survey of Canada basins, the plot will then show the model vs the actual station data.<br><br><br>"})
+
+    updateselection <- stn_training$total_name[str_detect(stn_training$total_name, ref_stn)]
+    print(updateselection)
+    updateSelectInput(inputId = "plot_discharge_site_sel",
+                      selected = updateselection)
+
+            output$text_plot_discharge <- renderText({"<br>The <b>Estimated Discharge</b> is a working <u>prototype</u> that has <b>NOT BEEN VALIDATED</b>. Please do not use this information for decision making at this time. The model finds the most similar Water Survey of Canada station that meets the selection criteria. Similarity is based on basin statistics (ClimateBC, Terrain and Freshwater Atlas). Then the total discharge and seasonal distribution is scaled to the basin of interest.<br><br><br>"})
+
+            shinyjs::show("plot_discharge")
+            shinyjs::show("text_plot_discharge")
+            shinyjs::show("plot_discharge_site_sel")
 
           }else{
             shinyjs::hide("plot_discharge")
@@ -1487,10 +1530,8 @@ server <- function(input, output, session) {
 # UPDATE LEAFLET ####
 
     incProgress(1, detail = "Update map")
-    print("map")
+    print("update map")
     bbbb <- st_bbox(new_ws2 %>% st_transform(4326))
-
-
 
     if(input$watershed_source == "Water Survey of Canada Basins") {
 
@@ -1629,3 +1670,4 @@ shinyApp(ui, server)
 #     )
 #   }
 # )
+

@@ -10,6 +10,8 @@
 # rf_station_reg <- randomForest(STATION_CLUSTER~.,data = wsc_q_basin_reg_rf %>% select(-STATION_NUMBER), ntree = 10, proximity = F, oob.prox = TRUE)
 # data.frame(round(importance(rf_station_reg), 2)) %>% arrange(-MeanDecreaseGini)
 
+
+
 wsc_estimate_cluster <- function(w = new_ws2,
                                  my_wetlands = my_wl,
                                  my_glaciers = my_gl,
