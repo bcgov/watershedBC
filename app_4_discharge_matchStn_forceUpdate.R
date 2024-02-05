@@ -50,8 +50,10 @@ pred_Q_findRef <- function(w = new_ws2_forRF(), force_station = NULL){
 pred_Q_rf <- function(w = new_ws2_forRF(), force_station = ref_stn, wsc_STATION_NUMBER = NULL){
 
   print(paste("force_station",force_station))
+  print(paste("w",w))
   # t <- st_read(conn, query = paste0("SELECT * FROM wsc_dayly_longterm_20240204"))
   # t %>% as_tibble() %>% pull(station_number) %>% unique()
+  # ref_wsc_daily <- st_read(conn, query = paste0("SELECT * FROM daily_wsc_clean_20240205 WHERE station_number = '07EF001'"))
   ref_wsc_daily <- st_read(conn, query = paste0("SELECT * FROM daily_wsc_clean_20240205 WHERE station_number = '",force_station,"'"))
   print(paste("ref_wsc_daily",ref_wsc_daily))
   ref_mad_perkm2 <- mean(ref_wsc_daily$mean)/w$area_km2
@@ -81,17 +83,23 @@ pred_Q_rf <- function(w = new_ws2_forRF(), force_station = ref_stn, wsc_STATION_
 
   if(is.null(wsc_STATION_NUMBER)){
     # style(ggplotly(pppp, dynamicTicks = T, width = 900), visible="legendonly", traces = c(1,7))
+    print("plotting null")
+
     ggplotly(pppp, dynamicTicks = T, width = 800)
   }else{
+    print("plotting wsc")
     print(wsc_STATION_NUMBER)
     # wsc_STATION_NUMBER = "08KB00"
     # in_train <- st_read(conn, query = paste0("SELECT * FROM ", wsc_parde_lon, " WHERE station_number = '",wsc_STATION_NUMBER,"' LIMIT 1"))
     wsc_lt <- st_read(conn, query = paste0("SELECT * FROM wsc_pp_fasstr_calc_daily_stats WHERE STATION_NUMBER = '",wsc_STATION_NUMBER,"'"))
+    print(nrow(wsc_lt))
     if(nrow(wsc_lt) == 0){
+      print("no wsc data")
       # style(ggplotly(pppp, dynamicTicks = T, width = 900), visible="legendonly", traces = c(1,7))
       ggplotly(pppp, dynamicTicks = T, width = 800)
     }
     if(nrow(wsc_lt) > 0){
+      print("wsc data")
       ggplotly(pppp +
                  geom_line(data = wsc_lt,
                            aes(yday, median,
@@ -100,6 +108,7 @@ pred_Q_rf <- function(w = new_ws2_forRF(), force_station = ref_stn, wsc_STATION_
                  labs(linetype = "Station Data")
                , dynamicTicks = T, width = 800)
     }
+
   }
   }
 

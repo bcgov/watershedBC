@@ -425,10 +425,10 @@ server <- function(input, output, session) {
                    # new_ws2_forRF(pred_Q_prepWS(w = new_ws2, my_wetlands = my_wl, my_glaciers = my_gl, my_lakes = my_lk))
 
                    if(input$watershed_source == "Water Survey of Canada Basins"){
-                     print(new_ws2$gnis_id)
+                     print(new_ws()$gnis_id)
                      output$plot_discharge <- renderPlotly({
                        # ref_stn <- pred_Q_findRef()
-                       pred_Q_rf(w = new_ws2_forRF(), force_station = my_force_station, wsc_STATION_NUMBER = new_ws2$gnis_id)
+                       pred_Q_rf(w = new_ws2_forRF(), force_station = my_force_station, wsc_STATION_NUMBER = new_ws()$gnis_id)
                      })
                    }else{
                      output$plot_discharge <- renderPlotly({
