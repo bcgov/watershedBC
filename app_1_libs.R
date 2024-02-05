@@ -24,6 +24,7 @@ library(plotly)
 library(shiny)
 library(shinyjs)
 library(shinycssloaders)
+library(shinyBS)
 
 # LEAFLET
 library(leaflet)
