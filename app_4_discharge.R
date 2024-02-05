@@ -6,11 +6,11 @@ wsc_estimate_cluster <- function(w = new_ws2,
 
   ws <- w %>% st_transform(4326) %>% select(geom)
   if(nrow(wetlands) > 0) {wetlands = sum((wetlands$area_m2 / (1000 * 1000))) / w$area_km2
-    }else{wetlands = 0}
+  }else{wetlands = 0}
   if(nrow(glaciers) > 0) {glaciers = sum((glaciers$area_m2 / (1000 * 1000))) / w$area_km2
-    }else{glaciers = 0}
+  }else{glaciers = 0}
   if(nrow(lakes) > 0) {lakes = sum((lakes$area_m2 / (1000 * 1000))) / w$area_km2
-    }else{lakes = 0}
+  }else{lakes = 0}
   ws <- ws %>%
     mutate(
       area_km2 = w$area_km2,
@@ -169,7 +169,7 @@ wsc_estimate_cluster <- function(w = new_ws2,
     wsc_lt <- st_read(conn, query = paste0("SELECT * FROM wsc_pp_fasstr_calc_daily_stats WHERE STATION_NUMBER = '",my_STATION_NUMBER,"'"))
     if(nrow(wsc_lt) == 0){
       style(ggplotly(pppp, dynamicTicks = T, width = 900), visible="legendonly", traces = c(1,7))
-      }
+    }
     if(nrow(wsc_lt) > 0){
       ggplotly(pppp +
                  geom_line(data = wsc_lt,
