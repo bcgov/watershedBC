@@ -1,3 +1,6 @@
+
+library(ranger)
+
 # DATABASE
 library(DBI)
 library(RPostgreSQL)
