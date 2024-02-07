@@ -12,7 +12,7 @@
 
   # wsc_parde <- read_csv("model_functions/bc_seasonal_regimes_alex_analysis_jan18_21clust.csv")
 
-  wsc_parde_lon <-  "bc_seasonal_regimes_alex_analysis_jan18_21clust_wsc_parde_lon"
+  # wsc_parde_lon <-  "bc_seasonal_regimes_alex_analysis_jan18_21clust_wsc_parde_lon"
   # wsc_parde_lon <- wsc_parde %>% pivot_longer(cols = -c(STATION_NUMBER, DRAINAGE_AREA_GROSS, LTMAD,
   #                                                       Cluster,clust_intercept,clust_slope,clust_r.squared,clust_adj.r.squared),
   #                                             names_to = "yday",
@@ -21,7 +21,7 @@
   #          yday = as.numeric(yday))
   # dbWriteTable(conn, wsc_parde_lon, wsc_parde_lon, overwrite = F)
 
-  wsc_parde_lon_stat <-  "bc_seasonal_regimes_alex_analysis_jan18_21clust_wsc_parde_lon_stat"
+  # wsc_parde_lon_stat <-  "bc_seasonal_regimes_alex_analysis_jan18_21clust_wsc_parde_lon_stat"
   # wsc_parde_lon_stat <- wsc_parde_lon %>%
   #   group_by(Cluster, yday) %>%
   #   summarize(p000 = quantile(parde_perc, probs = c(0.00), na.rm = T),
@@ -37,7 +37,7 @@
 
 # RANDOM FOREST MODEL ####
 
-  wsc_rf <- readRDS("model_functions/rf.RDS")
+  # wsc_rf <- readRDS("model_functions/rf.RDS")
 
 # WSC STATIONS ####
 
@@ -47,17 +47,14 @@
 
 # WSC TRAINING STATION IDS ####
 
-  stn_name_reg <- st_read(conn, query = "SELECT station_number FROM wsc_monthly_with_attri_dams_reg_20240204") %>%
-    mutate(regulated = "Regulated Flow")
-  stn_name_nat <- st_read(conn, query = "SELECT station_number FROM wsc_monthly_with_attri_dams_nat_20240204") %>%
-    mutate(regulated = "Natural Flow")
+  stn_name_reg <- dbGetQuery(conn, "SELECT station_number FROM wsc_monthly_with_attri_dams_reg_20240204") %>%mutate(regulated = "Regulated Flow")
+  stn_name_nat <- dbGetQuery(conn, "SELECT station_number FROM wsc_monthly_with_attri_dams_nat_20240204") %>% mutate(regulated = "Natural Flow")
 
   stn_training <- bind_rows(
     stn_name_reg %>%
-      left_join(wsc_pp %>% rename(station_number = stationnum) %>% select(station_number, name)) %>%
+      left_join(wsc_pp %>% rename(station_number = stationnum) %>% select(station_number, name), by = "station_number") %>%
       mutate(total_name = paste0(station_number," - ", name, " - ", regulated)),
     stn_name_nat %>%
-      left_join(wsc_pp %>% rename(station_number = stationnum) %>% select(station_number, name)) %>%
+      left_join(wsc_pp %>% rename(station_number = stationnum) %>% select(station_number, name), by = "station_number") %>%
       mutate(total_name = paste0(station_number," - ", name, " - ", regulated)))
-
 
