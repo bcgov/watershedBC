@@ -1,5 +1,8 @@
 res <- 300
 
+wsc_pp_ac <- wsc_pp %>% filter(status == "active") %>% mutate(id = stationnum)
+wsc_pp_dc <- wsc_pp %>% filter(status == "discontinued") %>% mutate(id = stationnum)
+
 initial_map <- leaflet() %>%
   addProviderTiles(providers$Esri.WorldImagery, group = "WorldImagery") %>%
   addProviderTiles(providers$Esri.WorldTopoMap, group = "WorldTopoMap") %>%
@@ -27,8 +30,12 @@ initial_map <- leaflet() %>%
                   resolution = res,
                   opacity = 1,
                   autozoom = F) %>%
+  addCircleMarkers(data = wsc_pp_ac, lng = wsc_pp_ac$lon, lat = wsc_pp_ac$lat, color = "steelblue", radius = 3, group = "WSC Active",
+                   label = paste0(wsc_pp_ac$name, " - ", wsc_pp_ac$stationnum, " [active]")) %>%
+  addCircleMarkers(data = wsc_pp_dc, lng = wsc_pp_dc$lon, lat = wsc_pp_dc$lat, color = "grey", radius = 3, group = "WSC Discontinued",
+                   label = paste0(wsc_pp_dc$name, " - ", wsc_pp_dc$stationnum, " [discontinued]")) %>%
   addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap"),
-                   overlayGroups = c("Sentinel 2023 (slow)","Landsat 2020-2023 (slow)","Landsat 1985-1990 (slow)"),
+                   overlayGroups = c("Sentinel 2023 (slow)", "Landsat 2020-2023 (slow)", "Landsat 1985-1990 (slow)", "WSC Active", "WSC Discontinued"),
                    options = layersControlOptions(collapsed = F)) %>%
-  hideGroup(c("Sentinel 2023 (slow)","Landsat 1985-1990 (slow)","Landsat 2020-2023 (slow)")) %>%
+  hideGroup(c("Sentinel 2023 (slow)","Landsat 1985-1990 (slow)","Landsat 2020-2023 (slow)","WSC Active","WSC Discontinued")) %>%
   addMouseCoordinates()
