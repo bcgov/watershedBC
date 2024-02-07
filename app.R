@@ -290,6 +290,9 @@ server <- function(input, output, session) {
           bbbb <- st_bbox(bas_4326)
 
           leafletProxy("mymap") %>%
+            leaflet::clearGroup("Watershed")
+
+          leafletProxy("mymap") %>%
             leaflet::clearGroup("FWA Wetland") %>% leaflet::clearGroup("FWA Lake") %>% leaflet::clearGroup("FWA Glacier") %>%
             leaflet::clearGroup("Glacier 1985") %>% leaflet::clearGroup("Glacier 2021") %>%
             leaflet::clearGroup("Fire") %>% leaflet::clearGroup("Cutblock") %>% leaflet::clearGroup("Roads") %>%
@@ -323,7 +326,7 @@ server <- function(input, output, session) {
 
         split_name <- strsplit(strsplit(input$psql_zoom_to_name, "id:")[[1]][2], ")")[[1]][1]
         bas <- st_read(conn, query = paste0("SELECT * FROM fwa_named WHERE gnis_id = ", split_name)) %>%
-          mutate(LONGITUDE = point_df_3005[1,1][[1]], LATITUDE = point_df_3005[1,2][[1]]) %>%
+          mutate(LONGITUDE = st_centroid(.)[1,1][[1]], LATITUDE = st_centroid(.)[1,2][[1]]) %>%
           mutate(area_km2 = area_m2 / (1000 * 1000))
         bas4326 <- bas %>% st_transform(4326)
         new_ws(bas)
