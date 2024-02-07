@@ -16,8 +16,6 @@
 
 # FUNCTIONS ####################################################################
 
-  # source("app_4_discharge.R")
-  # source("app_4_discharge_matchStn.R")
   source("app_4_discharge_matchStn_forceUpdate.R")
 
 # BASEMAP ######################################################################
@@ -29,7 +27,6 @@
 ui <- navbarPage(theme = "css/bcgov.css",
                  title = "watershedBC (v0.1 Beta Testing)",
                  useShinyjs(),
-
                  tabPanel("watershedBC (v0.1 Beta Testing)",
 
                           modalDialog(
@@ -88,7 +85,7 @@ ui <- navbarPage(theme = "css/bcgov.css",
 
                             shiny::column(
                               width = 10,
-                              leafletOutput("mymap", height = '600px') %>% withSpinner(color = "steelblue"),
+                              leafletOutput("mymap", height = '700px') %>% withSpinner(color = "steelblue"),
                               checkboxInput(inputId = "active_mouse", label = "Watershed Delineation on Map Click", value = T, ),
                               h3(textOutput(outputId = "ws_selection")),
                               actionButton(inputId = "run_button", label = "Run Report"),
@@ -100,6 +97,7 @@ ui <- navbarPage(theme = "css/bcgov.css",
                                                         label = "Override Reference Station for Streamflow Estimation",
                                                         choices = stn_training$total_name,
                                                         width = "500px"),
+                              leafletOutput("map_discharge_ref", height = '400px', width = "600px"),
                               htmlOutput("text_plot_discharge"),
                               plotlyOutput("plot_profile"), htmlOutput("text_plot_profile"),
                               plotlyOutput("plot_cef_group"),
@@ -172,6 +170,7 @@ server <- function(input, output, session) {
   shinyjs::hide('table_named')
   shinyjs::hide("plot_discharge")
   shinyjs::hide("plot_discharge_site_sel")
+  shinyjs::hide("map_discharge_ref")
   shinyjs::hide("text_plot_discharge")
   shinyjs::hide("plot_profile")
   shinyjs::hide("text_plot_profile")
@@ -257,6 +256,8 @@ server <- function(input, output, session) {
         point_df <- data.frame(lat = point$lat, lng = point$lng)
         print(paste0("point_df <- data.frame(lat = ",point$lat,", lng = ",point$lng,")"))
         # point_df <- data.frame(lat = 53.1204052831066, lng = -124.937831245044)
+        coords3005 <- point_df %>% st_as_sf(coords = c("lng","lat"), crs = 4326) %>%
+          st_transform(3005) %>% st_coordinates()
 
         # SELECT WATERSHED FROM ONE OF THESE OPTIONS
 
@@ -267,7 +268,8 @@ server <- function(input, output, session) {
             "SELECT * FROM fwa_named
              WHERE ST_Intersects(geom, ST_Transform(ST_SetSRID(ST_MakePoint(",point_df$lng,",",point_df$lat,"), 4326),3005))
              ORDER BY area_m2 ASC LIMIT 1"))
-          bas <- bas %>% st_cast("POLYGON", warn = F)
+          bas <- bas %>% st_cast("POLYGON", warn = F) %>%
+            mutate(LONGITUDE = coords3005[1,1][[1]], LATITUDE = coords3005[1,2][[1]])
           if(nrow(bas) > 0) {
             bas <- bas %>% mutate(area_km2 = area_m2 / (1000 * 1000))
             new_ws(bas)}}
@@ -281,7 +283,8 @@ server <- function(input, output, session) {
              ORDER BY area_m2 ASC LIMIT 1"))
           bas <- bas %>% st_cast("POLYGON", warn = F)
           bas$overl <- bas %>% st_intersects(as.data.frame(point) %>% st_as_sf(coords = c("lng", "lat"), crs = 4326) %>% st_transform(st_crs(bas)), sparse = F)
-          bas <- bas %>% filter(overl == T) %>% mutate(area_m2 = as.numeric(st_area(.)))
+          bas <- bas %>% filter(overl == T) %>% mutate(area_m2 = as.numeric(st_area(.))) %>%
+            mutate(LONGITUDE = coords3005[1,1][[1]], LATITUDE = coords3005[1,2][[1]])
           if (nrow(bas) > 0) {
             new_ws(bas %>% mutate(area_km2 = area_m2 / (1000 * 1000)) %>%
                      rename(gnis_name = id, gnis_id = iFWA))}}
@@ -297,7 +300,8 @@ server <- function(input, output, session) {
             bas <- bas %>%
               mutate(area_km2 = area_m2 / (1000 * 1000)) %>%
               rename(gnis_name = id, gnis_id = basin) %>%
-              ms_simplify(keep = 0.5)
+              ms_simplify(keep = 0.5) %>%
+              mutate(LONGITUDE = coords3005[1,1][[1]], LATITUDE = coords3005[1,2][[1]])
             new_ws(bas)}}
 
         if(input$watershed_source == "Water Survey of Canada Basins") {
@@ -317,7 +321,8 @@ server <- function(input, output, session) {
               gnis_id = bas$stationnum,
               area_km2 = area / (1000 * 1000)) %>%
               ms_simplify(keep = 0.5) %>%
-              st_transform(crs = 3005)
+              st_transform(crs = 3005) %>%
+              mutate(LONGITUDE = coords3005[1,1][[1]], LATITUDE = coords3005[1,2][[1]])
             new_ws(bas)}}
 
         # UPDATE MAP WITH SELECTED WATERSHED
@@ -418,28 +423,71 @@ server <- function(input, output, session) {
 
 
   # RUN REPORT #################################################################
-  observeEvent(input$plot_discharge_site_sel,
+  observeEvent(input$plot_discharge_site_sel, ignoreInit = T,
                {
                  withProgress(message = 'Update Reference Station...', max = 2,  {
+
                    my_force_station <- str_split_fixed(input$plot_discharge_site_sel, " - ", 3)[,1]
-                   # new_ws2_forRF(pred_Q_prepWS(w = new_ws2, my_wetlands = my_wl, my_glaciers = my_gl, my_lakes = my_lk))
+                   # my_force_station <- ref_stn
+
+                   ref_stn_ws <- st_read(conn, query = paste0("SELECT stationnum,name,area,geometry FROM wsc_drainagebasin_clean_3005
+                                                                                WHERE stationnum = '",my_force_station,"'")) %>% rename(geom = geometry)
+
+                   bbbbb <- st_bbox(bind_rows(
+                     ref_stn_ws %>% st_transform(4326),
+                     # new_ws2 %>% st_transform(4326)))
+                     new_ws() %>% st_transform(4326)))
+
+                   output$map_discharge_ref <- renderLeaflet({
+
+                     wsc_pp_ac <- wsc_pp %>% filter(status == "active") %>% mutate(id = stationnum)
+                     wsc_pp_dc <- wsc_pp %>% filter(status == "discontinued") %>% mutate(id = stationnum)
+
+
+                     leaflet() %>%
+                       #addProviderTiles(providers$Esri.WorldImagery, group = "WorldImagery") %>%
+                       #addProviderTiles(providers$Esri.WorldTopoMap, group = "WorldTopoMap") %>%
+                       addWMSTiles("http://maps.gov.bc.ca/arcserver/rest/services/province/roads_wm/MapServer/tile/{z}/{y}/{x}",
+                                   layers = "GRB_BSK",
+                                   options = WMSTileOptions(format = "image/png", transparent = TRUE),
+                                   group = "BC Basemap") %>%
+                       addMeasure(primaryLengthUnit = "kilometers",
+                                  secondaryLengthUnit = "meters",
+                                  primaryAreaUnit = "hectares",
+                                  secondaryAreaUnit = "sqmeters",
+                                  position = "topleft") %>%
+                       addPolygons(data = new_ws() %>% st_transform(4326), opacity = 1,
+                                   fillOpacity = 0, weight = 2, color = "black", label = "Watershed of Interest") %>%
+                       addPolygons(data = ref_stn_ws %>% st_transform(4326), opacity = 1,
+                                   fillOpacity = 0, weight = 2, color = "green", label = "WSC Reference") %>%
+                       addCircleMarkers(data = wsc_pp_ac, lng = wsc_pp_ac$lon, lat = wsc_pp_ac$lat, color = "steelblue", radius = 1, group = "WSC Active",
+                                        label = paste0(wsc_pp_ac$name, " - ", wsc_pp_ac$stationnum, " [active]")) %>%
+                       addCircleMarkers(data = wsc_pp_dc, lng = wsc_pp_dc$lon, lat = wsc_pp_dc$lat, color = "grey", radius = 1, group = "WSC Discontinued",
+                                        label = paste0(wsc_pp_dc$name, " - ", wsc_pp_dc$stationnum, " [discontinued]")) %>%
+                       fitBounds(bbbbb$xmin[[1]], bbbbb$ymin[[1]], bbbbb$xmax[[1]], bbbbb$ymax[[1]])
+
+
+                   })
 
                    if(input$watershed_source == "Water Survey of Canada Basins"){
                      print(new_ws()$gnis_id)
                      output$plot_discharge <- renderPlotly({
                        # ref_stn <- pred_Q_findRef()
                        pred_Q_rf(w = new_ws2_forRF(), force_station = my_force_station, wsc_STATION_NUMBER = new_ws()$gnis_id)
+                       # pred_Q_rf(w = temp(), force_station = my_force_station, wsc_STATION_NUMBER = new_ws()$gnis_id)
                      })
                    }else{
                      output$plot_discharge <- renderPlotly({
                        print("update2")
                        print(new_ws2_forRF())
-                       # ref_stn <- pred_Q_findRef()
-                       pred_Q_rf(w = new_ws2_forRF(), force_station = my_force_station)
+                         # ref_stn <- pred_Q_findRef()
+                         pred_Q_rf(w = new_ws2_forRF(), force_station = my_force_station)
+                         # pred_Q_rf(w = temp, force_station = my_force_station)
                      })
                    }
                  })
                })
+
   observeEvent(input$run_button, {
 
     shinyjs::hide('table_named')
@@ -482,7 +530,7 @@ server <- function(input, output, session) {
       new_ws2 <- new_ws()
       print(new_ws2)
       # new_ws2 <- bas
-      # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Tezzeron Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
+      # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Tezzeron Creek'") %>% mutate(area_km2 = area_m2/(1000*1000)) %>% mutate(LONGITUDE = st_coordinates(.)[1,1][[1]], LATITUDE = st_coordinates(.)[1,2][[1]])
       # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Bowron River'") %>% mutate(area_km2 = area_m2/(1000*1000))
       # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Joe Smith Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
       # new_ws2 <- st_read(refresh(), query = "SELECT * FROM fwa_named WHERE gnis_id = 26413") %>% mutate(area_km2 = area_m2/(1000*1000))
@@ -503,7 +551,7 @@ server <- function(input, output, session) {
 
           if("Streamflow and Freshwater" %in% input$run_modules) {
 
-            ## NAMED WATERSHEDS ####
+            # NAMED WATERSHEDS ####
 
             shinyjs::show('table_named')
             incProgress(1, detail = paste0("Get watersheds (", round(new_ws2$area_km2, 0), ")"))
@@ -583,7 +631,7 @@ server <- function(input, output, session) {
             })
           }else{shinyjs::hide("plot_fwa")}
 
-    # DAMS ####
+    ### DAMS ####
 
           dams <- postgis_get_point("dams", new_ws2_wkt)
           if(nrow(dams) == 0) {dams <- st_as_sf(data.frame(total_licence_storage = 0, long = 0, lat = 0),coords = c("long", "lat"),crs = 3005)}
@@ -593,7 +641,7 @@ server <- function(input, output, session) {
             mutate(regulated_percent = 100*(total_licence_storage/1e9)/area_km2) %>%
             mutate(regulated = case_when(regulated_percent > 0.003 ~ "regulated", TRUE ~ "unregulated"))
 
-# DISCHARGE ####
+### DISCHARGE ####
 
   if ("Streamflow and Freshwater" %in% input$run_modules) {
 
@@ -601,29 +649,68 @@ server <- function(input, output, session) {
     print("getting discharge")
 
     new_ws2_forRF(pred_Q_prepWS(w = new_ws2, my_wetlands = my_wl, my_glaciers = my_gl, my_lakes = my_lk))
+    # temp <- pred_Q_prepWS(w = new_ws2, my_wetlands = my_wl, my_glaciers = my_gl, my_lakes = my_lk)
     print(new_ws2_forRF())
     ref_stn <- pred_Q_findRef(w = new_ws2_forRF())
-    print("REFFF")
-    print(ref_stn)
-            if(input$watershed_source == "Water Survey of Canada Basins"){
-              print("WSC")
-              print(new_ws2$gnis_id)
-              output$plot_discharge <- renderPlotly({
-                pred_Q_rf(w = new_ws2_forRF(), force_station = ref_stn, wsc_STATION_NUMBER = new_ws2$gnis_id)
-              })
-            }else{
-              output$plot_discharge <- renderPlotly({
-                print("other")
-                pred_Q_rf(w = new_ws2_forRF(), force_station = ref_stn)
-              })
-            }
+    # ref_stn <- pred_Q_findRef(w = temp)
+    ref_stn_ws <- st_read(conn, query = paste0(
+      "SELECT stationnum,name,area,geometry FROM wsc_drainagebasin_clean_3005
+              WHERE stationnum = '",ref_stn,"'")) %>% rename(geom = geometry)
+
+    shinyjs::show("map_discharge_ref")
+    # output$map_discharge_ref <- renderLeaflet({
+    #
+    #   wsc_pp_ac <- wsc_pp %>% filter(status == "active") %>% mutate(id = stationnum)
+    #   wsc_pp_dc <- wsc_pp %>% filter(status == "discontinued") %>% mutate(id = stationnum)
+    #
+    #
+    # leaflet() %>%
+    #   #addProviderTiles(providers$Esri.WorldImagery, group = "WorldImagery") %>%
+    #     #addProviderTiles(providers$Esri.WorldTopoMap, group = "WorldTopoMap") %>%
+    #   addWMSTiles("http://maps.gov.bc.ca/arcserver/rest/services/province/roads_wm/MapServer/tile/{z}/{y}/{x}",
+    #               layers = "GRB_BSK",
+    #               options = WMSTileOptions(format = "image/png", transparent = TRUE),
+    #               group = "BC Basemap") %>%
+    #   addMeasure(primaryLengthUnit = "kilometers",
+    #              secondaryLengthUnit = "meters",
+    #              primaryAreaUnit = "hectares",
+    #              secondaryAreaUnit = "sqmeters",
+    #              position = "topleft") %>%
+    #   addPolygons(data = new_ws2 %>% st_transform(4326),
+    #               fillOpacity = 0, weight = 2, color = "black", label = "Watershed of Interest") %>%
+    #   addPolygons(data = ref_stn_ws %>% st_transform(4326),
+    #               fillOpacity = 0, weight = 2, color = "brown", label = "WSC Reference") %>%
+    #   addCircleMarkers(data = wsc_pp_ac, lng = wsc_pp_ac$lon, lat = wsc_pp_ac$lat, color = "steelblue", radius = 1, group = "WSC Active",
+    #                    label = paste0(wsc_pp_ac$name, " - ", wsc_pp_ac$stationnum, " [active]")) %>%
+    #   addCircleMarkers(data = wsc_pp_dc, lng = wsc_pp_dc$lon, lat = wsc_pp_dc$lat, color = "grey", radius = 1, group = "WSC Discontinued",
+    #                    label = paste0(wsc_pp_dc$name, " - ", wsc_pp_dc$stationnum, " [discontinued]"))
+    #
+    # })
+
+    # print("REFFF")
+    # print(ref_stn)
+    #         if(input$watershed_source == "Water Survey of Canada Basins"){
+    #           print("WSC")
+    #           print(new_ws2$gnis_id)
+    #           output$plot_discharge <- renderPlotly({
+    #             pred_Q_rf(w = new_ws2_forRF(), force_station = ref_stn, wsc_STATION_NUMBER = new_ws2$gnis_id)
+    #           })
+    #         }else{
+    #           output$plot_discharge <- renderPlotly({
+    #             print("other")
+    #             pred_Q_rf(w = new_ws2_forRF(), force_station = ref_stn, wsc_STATION_NUMBER = ref_stn)
+    #           })
+    #         }
 
     updateselection <- stn_training$total_name[str_detect(stn_training$total_name, ref_stn)]
     print(updateselection)
     updateSelectInput(inputId = "plot_discharge_site_sel",
                       selected = updateselection)
 
-            output$text_plot_discharge <- renderText({"<br>The <b>Estimated Discharge</b> is a working <u>prototype</u> that has <b>NOT BEEN VALIDATED</b>. Please do not use this information for decision making at this time. The model finds the most similar Water Survey of Canada station that meets the selection criteria. Similarity is based on basin statistics (ClimateBC, Terrain and Freshwater Atlas). Then the total discharge and seasonal distribution is scaled to the basin of interest.<br><br><br>"})
+            output$text_plot_discharge <- renderText({"<br>The <b>Estimated Discharge</b> is a working <u>prototype</u> that has <b>NOT BEEN VALIDATED</b>.
+              Please do not use this information for decision making at this time. The model finds the most similar Water Survey of Canada station that meets
+              the selection criteria. Similarity is based on basin statistics (ClimateBC, Terrain and Freshwater Atlas).
+              Then the total discharge and seasonal distribution is scaled to the basin of interest.<br><br><br>"})
 
             shinyjs::show("plot_discharge")
             shinyjs::show("text_plot_discharge")
