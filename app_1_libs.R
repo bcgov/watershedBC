@@ -1,3 +1,4 @@
+suppressPackageStartupMessages({
 
 library(ranger)
 
@@ -43,3 +44,5 @@ library(DT)
 # MODELS
 library(randomForest)
 library(readr)
+
+  })
