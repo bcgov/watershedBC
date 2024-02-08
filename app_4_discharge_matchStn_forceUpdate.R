@@ -32,15 +32,15 @@ pred_Q_findRef <- function(w = new_ws2_forRF(), force_station = NULL){
     if(is.null(force_station)){
 
       # PRED
-      if(w$regulated == "regulated"){model <- readRDS("rf_wsc_pred_station_reg_20240206_LL_A_PROB.RDS")}
-      if(w$regulated == "unregulated"){model <- readRDS("rf_wsc_pred_station_nat_20240206_LL_A_PROB.RDS")}
+      if(w$regulated == "regulated"){model <- readRDS("rf_wsc_pred_station_reg_20240206_LL_PROB.RDS")}
+      if(w$regulated == "unregulated"){model <- readRDS("rf_wsc_pred_station_nat_20240206_LL_PROB.RDS")}
 
       set.seed(500)
 
       pred_stn <- predict(model, w %>% st_drop_geometry() %>% select(wetland_sum_perc,
                                                                                 lake_sum_perc,
                                                                                 glacier_sum_perc,
-                                                                                area_km2,
+                                                                                # area_km2,
                                                                                 MAT,
                                                                                 MAP,
                                                                                 dem_p025,
