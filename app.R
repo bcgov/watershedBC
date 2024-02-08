@@ -24,10 +24,7 @@
 
 # UI ###########################################################################
 
-ui <- navbarPage(theme = "css/bcgov.css",
-                 title = "watershedBC (v0.1 Beta Testing)",
-                 useShinyjs(),
-                 tabPanel("watershedBC (v0.1 Beta Testing)",
+ui <- tagList(useShinyjs(), navbarPage(theme = "css/bcgov.css", title = "watershedBC (v0.1 Beta Testing)", tabPanel(title = "watershedBC (v0.1 Beta Testing)",
 
   modalDialog(
     HTML("Welcome to watershedBC, an experimental research tool that is in <u>active development</u>.
@@ -61,7 +58,7 @@ ui <- navbarPage(theme = "css/bcgov.css",
 
       shiny::selectizeInput(inputId = "psql_zoom_to_name",
         label = "Or search watersheds by name",
-        choices = c("", names$name),
+        choices = NULL,
         selected = "",
         multiple = F),
 
@@ -94,6 +91,7 @@ ui <- navbarPage(theme = "css/bcgov.css",
                          width = "600px"),
       leafletOutput("map_discharge_ref", height = '400px', width = "600px"),
       htmlOutput("text_plot_discharge"),
+      plotlyOutput("plot_hypsometry"), htmlOutput("text_plot_hypsometry"),
       plotlyOutput("plot_profile"), htmlOutput("text_plot_profile"),
       plotlyOutput("plot_cef_group"),
       plotlyOutput("plot_cef_group_flag"), htmlOutput("text_plot_cef_group_flag"),
@@ -127,62 +125,26 @@ ui <- navbarPage(theme = "css/bcgov.css",
 
   shiny::fluidRow(
     shiny::column(width = 12,
-                  style = "background-color:#003366; border-top:2px solid #fcba19;",
-                  tags$footer(class = "footer", tags$div(class = "container", style = "display:flex; justify-content:center; flex-direction:column; text-align:center; height:46px;", tags$ul(
-                  style = "display:flex; flex-direction:row; flex-wrap:wrap; margin:0; list-style:none; align-items:center; height:100%;",
-                  tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home", "Home", style = "font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
-                  tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/disclaimer", "Disclaimer", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
-                  tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/privacy", "Privacy", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
-                  tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/accessibility", "Accessibility", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
-                  tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/copyright", "Copyright", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
-                  tags$li(a(href = "https://www2.gov.bc.ca/StaticWebResources/static/gov3/html/contact-us.html", "Contact", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;"))))))))
-  )
+            style = "background-color:#003366; border-top:2px solid #fcba19;",
+            tags$footer(class = "footer", tags$div(class = "container", style = "display:flex; justify-content:center; flex-direction:column; text-align:center; height:46px;", tags$ul(
+            style = "display:flex; flex-direction:row; flex-wrap:wrap; margin:0; list-style:none; align-items:center; height:100%;",
+            tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home", "Home", style = "font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
+            tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/disclaimer", "Disclaimer", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
+            tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/privacy", "Privacy", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
+            tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/accessibility", "Accessibility", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
+            tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/copyright", "Copyright", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
+            tags$li(a(href = "https://www2.gov.bc.ca/StaticWebResources/static/gov3/html/contact-us.html", "Contact", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;"))))))))
+  ))
 
 # SERVER #######################################################################
 
 server <- function(input, output, session) {
 
+  ## ADD LIST TO
+  updateSelectizeInput(session, 'psql_zoom_to_name', choices = c("", names$name), server = TRUE)
+
   ## HIDE PLOTS ON START
-  shinyjs::hide("downloadPDF")
-  shinyjs::hide("downloadWatershed")
-  shinyjs::hide("downloadSpatial")
-  shinyjs::hide("downloadImagery")
-  shinyjs::hide("downloadDEM")
-  shinyjs::hide("downloadDischarge")
-  shinyjs::hide('table_named')
-  shinyjs::hide("plot_discharge")
-  shinyjs::hide("plot_discharge_site_sel")
-  shinyjs::hide("map_discharge_ref")
-  shinyjs::hide("text_plot_discharge")
-  shinyjs::hide("plot_profile")
-  shinyjs::hide("text_plot_profile")
-  shinyjs::hide("plot_cef_group")
-  shinyjs::hide("text_plot_cef_group")
-  shinyjs::hide("plot_cef_group_flag")
-  shinyjs::hide("text_plot_cef_group_flag")
-  shinyjs::hide("plot_timeseries")
-  shinyjs::hide("text_plot_timeseries")
-  shinyjs::hide("plot_timeseries_cumsum")
-  shinyjs::hide("text_plot_timeseries_cumsum")
-  shinyjs::hide("plot_eca")
-  shinyjs::hide("text_plot_eca")
-  shinyjs::hide("plot_elevbins")
-  shinyjs::hide("text_plot_elevbins")
-  shinyjs::hide("plot_fwa")
-  shinyjs::hide("text_plot_fwa")
-  shinyjs::hide("plot_auth")
-  shinyjs::hide("text_plot_auth")
-  shinyjs::hide("plot_dra")
-  shinyjs::hide("text_plot_dra")
-  shinyjs::hide("plot_mat")
-  shinyjs::hide("text_plot_mat")
-  shinyjs::hide("plot_map")
-  shinyjs::hide("text_plot_map")
-  shinyjs::hide("plot_cmd")
-  shinyjs::hide("text_plot_cmd")
-  shinyjs::hide("plot_landsat_1985")
-  shinyjs::hide("plot_landsat_2020")
-  shinyjs::hide("plot_sentinel_2023")
+  source("app_6_hidereport.R")
 
   ## RECORD SESSION INFO
   session_start <- Sys.time() %>% format(tz="UTC")
@@ -217,7 +179,7 @@ server <- function(input, output, session) {
         point_df_3005 <- point_df %>% st_as_sf(coords = c("lng","lat"), crs = 4326) %>% st_transform(3005) %>% st_coordinates()
         print(paste0("point_df <- data.frame(lat = ",point_df$lat,", lng = ",point_df$lng,")"))
 
-        # SELECT WATERSHED FROM ONE OF THESE OPTIONS
+        # SELECT WATERSHED FROM ONE OF THESE FOUR OPTIONS
 
         if(input$watershed_source == "Freshwater Atlas Named Watersheds") {
           basin_source("FWA")
@@ -277,16 +239,15 @@ server <- function(input, output, session) {
           }
 
         # ADD 3005 LAT/LON FOR RF
-        bas <- bas %>% mutate(LONGITUDE = point_df_3005[1,1][[1]], LATITUDE = point_df_3005[1,2][[1]])
         bas_4326 <- bas %>% st_transform(4326)
         new_ws(bas)
 
         # UPDATE MAP WITH SELECTED WATERSHED
         if(nrow(bas) > 0) {
+
           output$ws_selection <- renderText({paste0("You selected ", new_ws()$gnis_name, " (", format(round(as.numeric(new_ws()$area_km2), 0), big.mark = ",") ," sq.km)")})
           output$ws_selection_pred_time <- renderText({paste0("Estimated time to run a full report ~ ", 0.5 + round((new_ws()$area_km2 * 0.03) / 60, 1)," min")})
 
-          print("map")
           bbbb <- st_bbox(bas_4326)
 
           leafletProxy("mymap") %>%
@@ -299,7 +260,7 @@ server <- function(input, output, session) {
             leaflet::clearGroup("Water Rights") %>% leaflet::clearGroup("Approvals") %>%
             addPolygons(data = bas_4326, fillOpacity = 0, weight = 2, color = "blue", group = "Watershed")}
 
-        tictoc <- toc()$callback_msg
+        tictoc <- toc(quiet = T)$callback_msg
 
         if (nrow(bas) > 0) {
 
@@ -326,7 +287,6 @@ server <- function(input, output, session) {
 
         split_name <- strsplit(strsplit(input$psql_zoom_to_name, "id:")[[1]][2], ")")[[1]][1]
         bas <- st_read(conn, query = paste0("SELECT * FROM fwa_named WHERE gnis_id = ", split_name)) %>%
-          mutate(LONGITUDE = st_centroid(.)[1,1][[1]], LATITUDE = st_centroid(.)[1,2][[1]]) %>%
           mutate(area_km2 = area_m2 / (1000 * 1000))
         bas4326 <- bas %>% st_transform(4326)
         new_ws(bas)
@@ -336,7 +296,6 @@ server <- function(input, output, session) {
           output$ws_selection <- renderText({paste0("You selected ", new_ws()$gnis_name, " (", format(round(as.numeric(new_ws()$area_km2), 0), big.mark = ",") ," sq.km)")})
           output$ws_selection_pred_time <- renderText({paste0("Estimated time to run a full report ~ ", 0.5 + round((new_ws()$area_km2 * 0.03) / 60, 1)," min")})
 
-          print("map")
           bbbb <- st_bbox(bas4326)
 
           leafletProxy("mymap") %>%
@@ -398,7 +357,6 @@ server <- function(input, output, session) {
         })
 
       if(input$watershed_source == "Water Survey of Canada Basins"){
-        print(new_ws()$gnis_id)
         output$plot_discharge <- renderPlotly({pred_Q_rf(w = new_ws2_forRF(), force_station = my_force_station, wsc_STATION_NUMBER = new_ws()$gnis_id)})
           }else{
         output$plot_discharge <- renderPlotly({pred_Q_rf(w = new_ws2_forRF(), force_station = my_force_station)})
@@ -408,64 +366,60 @@ server <- function(input, output, session) {
 
   observeEvent(input$run_button, {
 
-    shinyjs::hide('table_named')
-    shinyjs::hide("plot_discharge")
-    shinyjs::hide("text_plot_discharge")
-    shinyjs::hide("plot_profile")
-    shinyjs::hide("text_plot_profile")
-    shinyjs::hide("plot_cef_group")
-    shinyjs::hide("text_plot_cef_group")
-    shinyjs::hide("plot_cef_group_flag")
-    shinyjs::hide("text_plot_cef_group_flag")
-    shinyjs::hide("plot_timeseries")
-    shinyjs::hide("text_plot_timeseries")
-    shinyjs::hide("plot_timeseries_cumsum")
-    shinyjs::hide("text_plot_timeseries_cumsum")
-    shinyjs::hide("plot_eca")
-    shinyjs::hide("text_plot_eca")
-    shinyjs::hide("plot_elevbins")
-    shinyjs::hide("text_plot_elevbins")
-    shinyjs::hide("plot_fwa")
-    shinyjs::hide("text_plot_fwa")
-    shinyjs::hide("plot_auth")
-    shinyjs::hide("text_plot_auth")
-    shinyjs::hide("plot_dra")
-    shinyjs::hide("text_plot_dra")
-    shinyjs::hide("plot_mat")
-    shinyjs::hide("text_plot_mat")
-    shinyjs::hide("plot_map")
-    shinyjs::hide("text_plot_map")
-    shinyjs::hide("plot_cmd")
-    shinyjs::hide("text_plot_cmd")
-    shinyjs::hide("plot_landsat_1985")
-    shinyjs::hide("plot_landsat_2020")
-    shinyjs::hide("plot_sentinel_2023")
+    source("app_6_hidereport.R")
 
     if(!is.null(new_ws())){
 
       new_ws2 <- new_ws()
-      print(new_ws2)
+      print(new_ws2 %>% st_drop_geometry() %>% select(starts_with("gnis")))
       # new_ws2 <- bas
-      # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Tezzeron Creek'") %>% mutate(area_km2 = area_m2/(1000*1000)) %>% mutate(LONGITUDE = st_coordinates(.)[1,1][[1]], LATITUDE = st_coordinates(.)[1,2][[1]])
+      # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Tezzeron Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
       # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Bowron River'") %>% mutate(area_km2 = area_m2/(1000*1000))
-      # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Joe Smith Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
-      # new_ws2 <- st_read(refresh(), query = "SELECT * FROM fwa_named WHERE gnis_id = 26413") %>% mutate(area_km2 = area_m2/(1000*1000))
-      # new_ws2 <- st_read(conn, query = paste0("SELECT * FROM basinsv4 WHERE id = 874586")) %>% rename(gnis_name = basin, gnis_id = id) %>% mutate(area_km2 = area_m2/(1000*1000))
 
-      if(new_ws2$area_km2 > 20000){
-        output$ws_run <-renderText({"Watershed is too large... please select a smaller watershed smaller than 20,000 sq. km."})
-      }
+      if(new_ws2$area_km2 >= 20000){output$ws_run <-renderText({"Watershed is too large... please select a smaller watershed smaller than 20,000 sq. km."})}
 
-      if(new_ws2$area_km2 < 200000){
+      if(new_ws2$area_km2 < 20000){
 
         # START TIMER
         tic()
 
         # WATERSHED TO WKT
         new_ws2_wkt <- st_as_text(st_geometry(new_ws2 %>% ms_explode()))
+        new_ws2_4326 <- new_ws2 %>% st_transform(4326)
 
         # START PROGRESS
         withProgress(message = 'Processing...', max = 15,  {
+
+
+# DEM STATISTICS ####
+
+  dem <- terra::rast("/vsicurl/https://bcbasin.s3.ca-central-1.amazonaws.com/COP_GLO30_FOR_watershedBC_cog.tif", win = terra::ext(new_ws2_4326))
+  dem <- terra::mask(dem, vect(new_ws2_4326))
+  dem_v <- dem %>% as_tibble() %>% pull(COP_GLO30_FOR_watershedBC_cog)
+  dem_quant <- data.frame(dem = quantile(dem_v, probs = seq(0,1,0.01), na.rm = T), quant = rev(seq(0,1,0.01))*100)
+  min_coords <- xyFromCell(dem, which.min(values(dem)))
+  min_coords <- data.frame(x = min_coords[1,1], y = min_coords[1,2]) %>% st_as_sf(coords = c("x","y"), crs = 4326) %>%
+    st_transform(3005) %>% filter(row_number() == 1) %>% st_coordinates()
+  new_ws2 <- new_ws2 %>% mutate(LONGITUDE = min_coords[1,1][[1]], LATITUDE = min_coords[1,2][[1]])
+
+  dem_min = dem_quant %>% filter(quant == 100) %>% pull(dem)
+  dem_max = dem_quant %>% filter(quant == 0) %>% pull(dem)
+  ws_area = new_ws2$area_km2
+  melton <- (dem_max-dem_min)/ws_area
+  h60 <- dem_quant %>% filter(quant == 60) %>% pull(dem)
+
+  output$plot_hypsometry <- renderPlotly({
+    ggplotly(
+      dem_quant %>% ggplot() +
+        geom_hline(aes(yintercept = h60), alpha = 0.6) +
+        geom_line(aes(quant, dem), color = "steelblue") +
+        geom_text(aes(90, h60*1.05, label = paste0("h60: ", h60," m"))) +
+        theme_bw() +
+        scale_x_continuous(expand = c(0,0)) +
+        scale_y_continuous(expand = c(0,0)) +
+        labs(x = "Area (%)", y = "Elevation (m)", title = paste0("Basin Hypsometry [Melton Index: ", round(melton,2),"]"))
+      , dynamicTicks = T, width = 800)
+    })
 
 # STREAMFLOW AND FRESHWATER ####
 
@@ -476,10 +430,10 @@ server <- function(input, output, session) {
     incProgress(1, detail = "Get Watersheds")
 
     print("getting watersheds")
-    my_named <- postgis_get_pol("fwa_named","*",elev = F,my_wkt = new_ws2_wkt,min_area_km2 = new_ws2$area_km2 * 0.1)
+    my_named <- postgis_get_pol("fwa_named","*",elev = F, my_wkt = new_ws2_wkt,min_area_km2 = new_ws2$area_km2 * 0.1)
 
     if(nrow(my_named) > 0){
-      my_named = my_named %>%
+      my_named <- my_named %>%
         mutate(area_km2 = area_m2 / (1000 * 1000)) %>%
         dplyr::select(gnis_name, area_km2) %>%
         arrange(-area_km2) %>%
@@ -497,19 +451,15 @@ server <- function(input, output, session) {
   # FRESHWATER RESOURCES ####
 
     incProgress(1, detail = "Get Wetlands")
-    print("getting wetlands")
-
-    my_wl <- postgis_get_pol("fwa_wetlands", "waterbody_type", my_wkt = new_ws2_wkt)
+    my_wl <- postgis_get_pol("fwa_wetlands", "waterbody_type", my_wkt = new_ws2_wkt, my_dem = dem)
     if(nrow(my_wl) == 0){my_wl <- st_as_sf(data.frame(clipped_area_m2 = 0, waterbody_type = "", elevation = 0, area_m2 = 0, lat = 0, long = 0, type = "fwa_wetlands"), coords = c("long", "lat"), crs = 3005)}
 
     incProgress(1, detail = "Get Lakes")
-    print("getting lakes")
-    my_lk <- postgis_get_pol("fwa_lakes", "waterbody_type", my_wkt = new_ws2_wkt)
+    my_lk <- postgis_get_pol("fwa_lakes", "waterbody_type", my_wkt = new_ws2_wkt, my_dem = dem)
     if(nrow(my_lk) == 0){my_lk <- st_as_sf(data.frame(clipped_area_m2 = 0,waterbody_type = "",elevation = 0,area_m2 = 0,lat = 0,long = 0,type = "fwa_lakes"),coords = c("long", "lat"),crs = 3005)}
 
     incProgress(1, detail = "Get Glaciers")
-    print("getting glaciers")
-    my_gl <- postgis_get_pol("fwa_glaciers", "waterbody_type", my_wkt = new_ws2_wkt)
+    my_gl <- postgis_get_pol("fwa_glaciers", "waterbody_type", my_wkt = new_ws2_wkt, my_dem = dem)
     if(nrow(my_gl) == 0) {my_gl <- st_as_sf(data.frame(clipped_area_m2 = 0,waterbody_type = "",elevation = 0,area_m2 = 0,lat = 0,long = 0,type = "fwa_glaciers"),coords = c("long", "lat"),crs = 3005)}
 
     my_gl_1985 <- bcdata::bcdc_query_geodata("historical-glaciers") %>% select(GBA_GLHIST_SYSID, GLACIER_ID, SOURCE_YEAR, FEATURE_AREA_SQM) %>% filter(INTERSECTS(new_ws2)) %>% collect()
@@ -644,11 +594,11 @@ server <- function(input, output, session) {
 
     incProgress(1, detail = "Get Wildfires")
     print("getting fires")
-    my_wf <- postgis_get_pol("fire", "fire_year", my_wkt = new_ws2_wkt)
+    my_wf <- postgis_get_pol("fire", "fire_year", my_wkt = new_ws2_wkt, my_dem = dem)
 
     incProgress(1, detail = "Get Cutblocks")
     print("getting blocks")
-    my_cb <- postgis_get_pol("cutblocks", "harvest_year", my_wkt = new_ws2_wkt)
+    my_cb <- postgis_get_pol("cutblocks", "harvest_year", my_wkt = new_ws2_wkt, my_dem = dem)
 
     if(nrow(my_wf) == 0) {my_wf <- st_as_sf(data.frame(clipped_area_m2 = 0,fire_year = 1900,elevation = 0,area_m2 = 0,lat = 0,long = 0,type = "fire"),coords = c("long", "lat"),crs = 3005)}
     if(nrow(my_cb) == 0) {my_cb <- st_as_sf(data.frame(clipped_area_m2 = 0,harvest_year = 1900,elevation = 0,area_m2 = 0,lat = 0,long = 0,type = "cutblock"), coords = c("long", "lat"),crs = 3005)}
@@ -1482,8 +1432,8 @@ server <- function(input, output, session) {
   output$ws_selection_pred_time <- renderText({"Processing complete!"})
 
   # shinyjs::show('export_pdf')
-
   # conn <- refresh()
+
   dbWriteTable(conn, "usage",
                data.frame(date_time = as.character(session_start),
                           session_token = session_token,
