@@ -23,11 +23,8 @@
   source("app_5_leaflet.R")
 
 # UI ###########################################################################
-
-ui <- navbarPage(theme = "css/bcgov.css",
-                 title = "watershedBC (v0.1 Beta Testing)",
-                 useShinyjs(),
-                 tabPanel("watershedBC (v0.1 Beta Testing)",
+# shiny
+ui <- tagList(useShinyjs(), navbarPage(theme = "css/bcgov.css", title = "watershedBC (v0.1 Beta Testing)", tabPanel(title = "watershedBC (v0.1 Beta Testing)",
 
   modalDialog(
     HTML("Welcome to watershedBC, an experimental research tool that is in <u>active development</u>.
@@ -94,6 +91,7 @@ ui <- navbarPage(theme = "css/bcgov.css",
                          width = "600px"),
       leafletOutput("map_discharge_ref", height = '400px', width = "600px"),
       htmlOutput("text_plot_discharge"),
+      plotlyOutput("plot_hypsometry"), htmlOutput("text_plot_hypsometry"),
       plotlyOutput("plot_profile"), htmlOutput("text_plot_profile"),
       plotlyOutput("plot_cef_group"),
       plotlyOutput("plot_cef_group_flag"), htmlOutput("text_plot_cef_group_flag"),
@@ -127,62 +125,23 @@ ui <- navbarPage(theme = "css/bcgov.css",
 
   shiny::fluidRow(
     shiny::column(width = 12,
-                  style = "background-color:#003366; border-top:2px solid #fcba19;",
-                  tags$footer(class = "footer", tags$div(class = "container", style = "display:flex; justify-content:center; flex-direction:column; text-align:center; height:46px;", tags$ul(
-                  style = "display:flex; flex-direction:row; flex-wrap:wrap; margin:0; list-style:none; align-items:center; height:100%;",
-                  tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home", "Home", style = "font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
-                  tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/disclaimer", "Disclaimer", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
-                  tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/privacy", "Privacy", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
-                  tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/accessibility", "Accessibility", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
-                  tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/copyright", "Copyright", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
-                  tags$li(a(href = "https://www2.gov.bc.ca/StaticWebResources/static/gov3/html/contact-us.html", "Contact", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;"))))))))
-  )
+            style = "background-color:#003366; border-top:2px solid #fcba19;",
+            tags$footer(class = "footer", tags$div(class = "container", style = "display:flex; justify-content:center; flex-direction:column; text-align:center; height:46px;", tags$ul(
+            style = "display:flex; flex-direction:row; flex-wrap:wrap; margin:0; list-style:none; align-items:center; height:100%;",
+            tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home", "Home", style = "font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
+            tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/disclaimer", "Disclaimer", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
+            tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/privacy", "Privacy", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
+            tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/accessibility", "Accessibility", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
+            tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/copyright", "Copyright", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
+            tags$li(a(href = "https://www2.gov.bc.ca/StaticWebResources/static/gov3/html/contact-us.html", "Contact", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;"))))))))
+  ))
 
 # SERVER #######################################################################
 
 server <- function(input, output, session) {
 
   ## HIDE PLOTS ON START
-  shinyjs::hide("downloadPDF")
-  shinyjs::hide("downloadWatershed")
-  shinyjs::hide("downloadSpatial")
-  shinyjs::hide("downloadImagery")
-  shinyjs::hide("downloadDEM")
-  shinyjs::hide("downloadDischarge")
-  shinyjs::hide('table_named')
-  shinyjs::hide("plot_discharge")
-  shinyjs::hide("plot_discharge_site_sel")
-  shinyjs::hide("map_discharge_ref")
-  shinyjs::hide("text_plot_discharge")
-  shinyjs::hide("plot_profile")
-  shinyjs::hide("text_plot_profile")
-  shinyjs::hide("plot_cef_group")
-  shinyjs::hide("text_plot_cef_group")
-  shinyjs::hide("plot_cef_group_flag")
-  shinyjs::hide("text_plot_cef_group_flag")
-  shinyjs::hide("plot_timeseries")
-  shinyjs::hide("text_plot_timeseries")
-  shinyjs::hide("plot_timeseries_cumsum")
-  shinyjs::hide("text_plot_timeseries_cumsum")
-  shinyjs::hide("plot_eca")
-  shinyjs::hide("text_plot_eca")
-  shinyjs::hide("plot_elevbins")
-  shinyjs::hide("text_plot_elevbins")
-  shinyjs::hide("plot_fwa")
-  shinyjs::hide("text_plot_fwa")
-  shinyjs::hide("plot_auth")
-  shinyjs::hide("text_plot_auth")
-  shinyjs::hide("plot_dra")
-  shinyjs::hide("text_plot_dra")
-  shinyjs::hide("plot_mat")
-  shinyjs::hide("text_plot_mat")
-  shinyjs::hide("plot_map")
-  shinyjs::hide("text_plot_map")
-  shinyjs::hide("plot_cmd")
-  shinyjs::hide("text_plot_cmd")
-  shinyjs::hide("plot_landsat_1985")
-  shinyjs::hide("plot_landsat_2020")
-  shinyjs::hide("plot_sentinel_2023")
+  source("app_6_hidereport.R")
 
   ## RECORD SESSION INFO
   session_start <- Sys.time() %>% format(tz="UTC")
@@ -217,7 +176,7 @@ server <- function(input, output, session) {
         point_df_3005 <- point_df %>% st_as_sf(coords = c("lng","lat"), crs = 4326) %>% st_transform(3005) %>% st_coordinates()
         print(paste0("point_df <- data.frame(lat = ",point_df$lat,", lng = ",point_df$lng,")"))
 
-        # SELECT WATERSHED FROM ONE OF THESE OPTIONS
+        # SELECT WATERSHED FROM ONE OF THESE FOUR OPTIONS
 
         if(input$watershed_source == "Freshwater Atlas Named Watersheds") {
           basin_source("FWA")
@@ -277,7 +236,7 @@ server <- function(input, output, session) {
           }
 
         # ADD 3005 LAT/LON FOR RF
-        bas <- bas %>% mutate(LONGITUDE = point_df_3005[1,1][[1]], LATITUDE = point_df_3005[1,2][[1]])
+        # bas <- bas %>% mutate(LONGITUDE = point_df_3005[1,1][[1]], LATITUDE = point_df_3005[1,2][[1]])
         bas_4326 <- bas %>% st_transform(4326)
         new_ws(bas)
 
@@ -325,8 +284,10 @@ server <- function(input, output, session) {
       withProgress(message = 'Finding watershed...', max = 1,  {
 
         split_name <- strsplit(strsplit(input$psql_zoom_to_name, "id:")[[1]][2], ")")[[1]][1]
+        # split_name <- "08LF007"
+        # s <- st_read(conn, query = paste0("SELECT * FROM fwa_named"))
         bas <- st_read(conn, query = paste0("SELECT * FROM fwa_named WHERE gnis_id = ", split_name)) %>%
-          mutate(LONGITUDE = st_centroid(.)[1,1][[1]], LATITUDE = st_centroid(.)[1,2][[1]]) %>%
+          # mutate(LONGITUDE = st_centroid(.)[1,1][[1]], LATITUDE = st_centroid(.)[1,2][[1]]) %>%
           mutate(area_km2 = area_m2 / (1000 * 1000))
         bas4326 <- bas %>% st_transform(4326)
         new_ws(bas)
@@ -446,7 +407,7 @@ server <- function(input, output, session) {
       new_ws2 <- new_ws()
       print(new_ws2)
       # new_ws2 <- bas
-      # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Tezzeron Creek'") %>% mutate(area_km2 = area_m2/(1000*1000)) %>% mutate(LONGITUDE = st_coordinates(.)[1,1][[1]], LATITUDE = st_coordinates(.)[1,2][[1]])
+      # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Tezzeron Creek'") %>% mutate(area_km2 = area_m2/(1000*1000)) #%>% mutate(LONGITUDE = st_coordinates(.)[1,1][[1]], LATITUDE = st_coordinates(.)[1,2][[1]])
       # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Bowron River'") %>% mutate(area_km2 = area_m2/(1000*1000))
       # new_ws2 <- st_read(conn, query = "SELECT * FROM fwa_named WHERE gnis_name = 'Joe Smith Creek'") %>% mutate(area_km2 = area_m2/(1000*1000))
       # new_ws2 <- st_read(refresh(), query = "SELECT * FROM fwa_named WHERE gnis_id = 26413") %>% mutate(area_km2 = area_m2/(1000*1000))
@@ -466,6 +427,34 @@ server <- function(input, output, session) {
 
         # START PROGRESS
         withProgress(message = 'Processing...', max = 15,  {
+
+
+# DEM STATISTICS ####
+
+  dem <- elevatr::get_elev_raster(new_ws2, 8) %>% stars::st_as_stars()
+  dem <- dem[new_ws2]
+  names(dem) <- "dem"
+  dem_quant <- data.frame(dem = quantile(dem$dem, probs = seq(0,1,0.01), na.rm = T),
+                          quant = rev(seq(0,1,0.01)))
+  dem_min_pt <- st_coordinates(dem[dem==dem_quant %>% filter(quant == 0) %>% pull(dem)] %>% st_as_sf(as_points = T) %>% filter(row_number() == 1))
+  new_ws2 <- new_ws2 %>% mutate(LONGITUDE = dem_min_pt[1,1][[1]], LATITUDE = dem_min_pt[1,2][[1]])
+
+  dem_min = dem_quant %>% filter(quant == 1) %>% pull(dem)
+  dem_max = dem_quant %>% filter(quant == 0) %>% pull(dem)
+  ws_area = new_ws2$area_km2
+  melton <- (dem_max-dem_min)/ws_area
+
+  output$plot_hypsometry <- renderPlotly({
+  ggplotly(dem_quant %>% ggplot() +
+    geom_ribbon(aes(quant*100, ymin = dem_quant %>% filter(quant == 1) %>% pull(dem), ymax = dem), fill = "steelblue", alpha = 0.6) +
+    geom_hline(yintercept = dem_quant %>% filter(quant == 0.6) %>% pull(dem)) +
+    theme_bw() +
+    scale_x_continuous(expand = c(0,0), n.breaks = 10) +
+    scale_y_continuous(expand = c(0,0), n.breaks = 10) +
+    labs(x = "Percent of the watershed below", y = "Elevation (m asl)",
+         title = paste0("Basin Hypsometry [Melton Index: ", round(melton,2),"]")) +
+    theme(aspect.ratio = 0.6), dynamicTicks = T, width = 800)
+    })
 
 # STREAMFLOW AND FRESHWATER ####
 
