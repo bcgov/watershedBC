@@ -84,6 +84,7 @@ ui <- tagList(useShinyjs(), navbarPage(theme = "css/bcgov.css", title = "watersh
       textOutput(outputId = "ws_run"),
       textOutput(outputId = "ws_selection_pred_time"),
       tableOutput('table_named'),
+      downloadButton("downloadWatershed", "Watershed"),
       plotlyOutput("plot_discharge"),
       shiny::selectInput(inputId = "plot_discharge_site_sel",
                          label = "Override Reference Station for Streamflow Estimation",
@@ -106,14 +107,16 @@ ui <- tagList(useShinyjs(), navbarPage(theme = "css/bcgov.css", title = "watersh
       plotlyOutput("plot_map"), htmlOutput("text_plot_map"),
       plotlyOutput("plot_cmd"), htmlOutput("text_plot_cmd"),
       plotOutput("plot_landsat_1985", width = 800, height = 800),
+      downloadButton("downloadImagery1985", "Imagery - L5 1985"),
       plotOutput("plot_landsat_2020", width = 800, height = 800),
+      downloadButton("downloadImagery2020", "Imagery - L8 2020"),
       plotOutput("plot_sentinel_2023", width = 800, height = 800),
+      downloadButton("downloadImagery2023", "Imagery - S2 2023"),br(),br(),
       downloadButton("downloadPDF", "Export PDF"),
-      downloadButton("downloadWatershed", "Watershed"),
-      downloadButton("downloadSpatial", "Spatial"),
-      downloadButton("downloadImagery", "Imagery"),
-      downloadButton("downloadDEM", "DEM"),
-      downloadButton("downloadDischarge", "Discharge"),br(),br(),br(),br())),
+      # downloadButton("downloadSpatial", "Spatial"),
+      # downloadButton("downloadDEM", "DEM"),
+      # downloadButton("downloadDischarge", "Discharge"),
+      br(),br(),br(),br())),
 
   shiny::fluidRow(
     shiny::column(width = 12,
@@ -349,11 +352,15 @@ server <- function(input, output, session) {
                       layers = "GRB_BSK", options = WMSTileOptions(format = "image/png", transparent = TRUE), group = "BC Basemap") %>%
           addMeasure(primaryLengthUnit = "kilometers", secondaryLengthUnit = "meters", primaryAreaUnit = "hectares",
                      secondaryAreaUnit = "sqmeters", position = "topleft") %>%
-          addPolygons(data = new_ws() %>% st_transform(4326), opacity = 1, fillOpacity = 0, weight = 2, color = "black", label = "Watershed of Interest") %>%
-          addPolygons(data = ref_stn_ws %>% st_transform(4326), opacity = 1, fillOpacity = 0.2, fillColor = "green", weight = 2, color = "green", label = "WSC Reference") %>%
+          addPolygons(data = new_ws() %>% st_transform(4326), opacity = 1, fillOpacity = 0, weight = 2, color = "black", label = "Watershed of Interest", group =  "Watershed of Interest") %>%
+          addPolygons(data = ref_stn_ws %>% st_transform(4326), opacity = 1, fillOpacity = 0.2, fillColor = "green", weight = 2, color = "green", label = paste0("WSC Reference: ", my_force_station), group = paste0("WSC Reference: ", my_force_station)) %>%
           addCircleMarkers(data = wsc_pp_ac, lng = wsc_pp_ac$lon, lat = wsc_pp_ac$lat, color = "steelblue", radius = 1, group = "WSC Active", label = paste0(wsc_pp_ac$name, " - ", wsc_pp_ac$stationnum, " [active]")) %>%
           addCircleMarkers(data = wsc_pp_dc, lng = wsc_pp_dc$lon, lat = wsc_pp_dc$lat, color = "grey", radius = 1, group = "WSC Discontinued", label = paste0(wsc_pp_dc$name, " - ", wsc_pp_dc$stationnum, " [discontinued]")) %>%
-          fitBounds(bbbbb$xmin[[1]], bbbbb$ymin[[1]], bbbbb$xmax[[1]], bbbbb$ymax[[1]])
+          fitBounds(bbbbb$xmin[[1]], bbbbb$ymin[[1]], bbbbb$xmax[[1]], bbbbb$ymax[[1]]) %>%
+          addLayersControl(baseGroups = c("BC Basemap"),
+                           overlayGroups = c("WSC Active", "WSC Discontinued","Watershed of Interest", paste0("WSC Reference: ", my_force_station)),
+                           options = layersControlOptions(collapsed = F)) %>%
+          addMouseCoordinates()
         })
 
       if(input$watershed_source == "Water Survey of Canada Basins"){
@@ -391,9 +398,30 @@ server <- function(input, output, session) {
         withProgress(message = 'Processing...', max = 15,  {
 
 
+# SOILS ####
+#
+#
+#
+#   terra::mask(parent, vect(new_ws2)) %>% plot
+#     parent %>% terra::
+# # "Glaciolacustrine",
+# # "Till",
+# # "Organic	O
+# #   13	Rock	R
+# #   14	Undifferentiated	U
+# #   15	Volcanic	V
+# #   16	Marine	W
+# #   17	Glaciomarine	WG
+# #   18	Water	N
+#
+#
+
 # DEM STATISTICS ####
 
-  dem <- terra::rast("/vsicurl/https://bcbasin.s3.ca-central-1.amazonaws.com/COP_GLO30_FOR_watershedBC_cog.tif", win = terra::ext(new_ws2_4326))
+  incProgress(1, detail = "Get DEM...")
+
+  dem <- terra::rast("/vsicurl/https://bcbasin.s3.ca-central-1.amazonaws.com/COP_GLO30_FOR_watershedBC_cog.tif",
+                     win = terra::ext(new_ws2_4326))
   dem <- terra::mask(dem, vect(new_ws2_4326))
   dem_v <- dem %>% as_tibble() %>% pull(COP_GLO30_FOR_watershedBC_cog)
   dem_quant <- data.frame(dem = quantile(dem_v, probs = seq(0,1,0.01), na.rm = T), quant = rev(seq(0,1,0.01))*100)
@@ -405,8 +433,10 @@ server <- function(input, output, session) {
   dem_min = dem_quant %>% filter(quant == 100) %>% pull(dem)
   dem_max = dem_quant %>% filter(quant == 0) %>% pull(dem)
   ws_area = new_ws2$area_km2
-  melton <- (dem_max-dem_min)/ws_area
+  melton <- ((dem_max/1000)-(dem_min/1000))/sqrt(ws_area)
   h60 <- dem_quant %>% filter(quant == 60) %>% pull(dem)
+
+  shinyjs::show("plot_hypsometry")
 
   output$plot_hypsometry <- renderPlotly({
     ggplotly(
@@ -417,7 +447,7 @@ server <- function(input, output, session) {
         theme_bw() +
         scale_x_continuous(expand = c(0,0)) +
         scale_y_continuous(expand = c(0,0)) +
-        labs(x = "Area (%)", y = "Elevation (m)", title = paste0("Basin Hypsometry [Melton Index: ", round(melton,2),"]"))
+        labs(x = "Area (%)", y = "Elevation (m)", title = paste0("Basin Hypsometry [Melton Ratio: ", round(melton,2),"]"))
       , dynamicTicks = T, width = 800)
     })
 
@@ -1304,20 +1334,25 @@ server <- function(input, output, session) {
 
     v <- vect(new_ws2 %>% st_transform(4326))
 
+    r1985 <- terra::rast("/vsicurl/https://bcbasin.s3.ca-central-1.amazonaws.com/1985_1990v3_COG_AV_JP_BIG.tif", win = terra::ext(new_ws2 %>% st_transform(4326)))
     output$plot_landsat_1985 <- renderPlot({
-      r1985 <- terra::rast("/vsicurl/https://bcbasin.s3.ca-central-1.amazonaws.com/1985_1990v3_COG_AV_JP_BIG.tif", win = terra::ext(new_ws2 %>% st_transform(4326)))
             plot(r1985, main = "Landsat 1985-1990", mar = 2)
             plot(v, add = T, border = "red", lwd = 2)}, height = 800, width = 800)
 
+    r2020 <- terra::rast("/vsicurl/https://bcbasin.s3.ca-central-1.amazonaws.com/2020_2023v3_COG_AV_JP_BIG.tif", win = terra::ext(new_ws2 %>% st_transform(4326)))
     output$plot_landsat_2020 <- renderPlot({
-      r2020 <- terra::rast("/vsicurl/https://bcbasin.s3.ca-central-1.amazonaws.com/2020_2023v3_COG_AV_JP_BIG.tif", win = terra::ext(new_ws2 %>% st_transform(4326)))
             plot(r2020, main = "Landsat 2020-2023", mar = 2)
             plot(v, add = T, border = "red", lwd = 2)}, height = 800, width = 800)
 
+    r2023 <- terra::rast("/vsicurl/https://bcbasin.s3.ca-central-1.amazonaws.com/BC_2023v2_4326_v2_bigTiff_JPEG.tif", win = terra::ext(new_ws2 %>% st_transform(4326)))
     output$plot_sentinel_2023 <- renderPlot({
-      r2023 <- terra::rast("/vsicurl/https://bcbasin.s3.ca-central-1.amazonaws.com/BC_2023v2_4326_v2_bigTiff_JPEG.tif", win = terra::ext(new_ws2 %>% st_transform(4326)))
-            plot(r2023, main = "Sentinel Mosaic 2023", mar = 2)
-            plot(v, add = T, border = "red", lwd = 2)}, height = 800, width = 800)
+      plot(r2023, main = "Sentinel Mosaic 2023", mar = 2)
+      plot(v, add = T, border = "red", lwd = 2)}, height = 800, width = 800)
+
+    shinyjs::show("downloadImagery1985")
+    shinyjs::show("downloadImagery2020")
+    shinyjs::show("downloadImagery2023")
+
 
     }else{
       shinyjs::hide("plot_landsat_1985")
@@ -1412,8 +1447,10 @@ server <- function(input, output, session) {
 
 # DOWNLOAD BUTTONS ####
 
-  output$downloadWatershed <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, "_watershed.sqlite")}, content = function(file) { st_write(new_ws2, file)})
-  output$downloadCutblocks <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, "_cutblocks.sqlite")}, content = function(file) { st_write(my_cb, file)})
+  output$downloadWatershed <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, "_watershed.sqlite")}, content = function(file) { st_write(new_ws2 %>% bind_rows(my_named), file)})
+  output$downloadImagery1985 <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, "_L5_1985.tif")}, content = function(file) { terra::writeRaster(r1985, file)})
+  output$downloadImagery2020 <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, "_L8_2020.tif")}, content = function(file) { terra::writeRaster(r2020, file)})
+  output$downloadImagery2023 <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, "_S2_2023.tif")}, content = function(file) { terra::writeRaster(r2023, file)})
   output$downloadWildfires <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, "_wildfires.sqlite")}, content = function(file) { st_write(my_wf, file)})
   output$downloadWetlands <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, "_wetlands.sqlite")}, content = function(file) { st_write(my_wl, file)})
   output$downloadLakes <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, "_lakes.sqlite")}, content = function(file) { st_write(my_lk, file)})
@@ -1421,7 +1458,6 @@ server <- function(input, output, session) {
   shinyjs::show("downloadPDF")
   shinyjs::show("downloadWatershed")
   shinyjs::show("downloadSpatial")
-  shinyjs::show("downloadImagery")
   shinyjs::show("downloadDEM")
   shinyjs::show("downloadDischarge")
 
