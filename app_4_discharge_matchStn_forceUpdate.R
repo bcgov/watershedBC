@@ -32,15 +32,15 @@ pred_Q_findRef <- function(w = new_ws2_forRF(), force_station = NULL){
     if(is.null(force_station)){
 
       # PRED
-      if(w$regulated == "regulated"){model <- readRDS("rf_wsc_pred_station_reg_20240206_LL_PROB.RDS")}
-      if(w$regulated == "unregulated"){model <- readRDS("rf_wsc_pred_station_nat_20240206_LL_PROB.RDS")}
+      if(w$regulated == "regulated"){model <- readRDS("rf_wsc_pred_station_reg_20240206_LL_A_PROB.RDS")}
+      if(w$regulated == "unregulated"){model <- readRDS("rf_wsc_pred_station_nat_20240206_LL_A_PROB.RDS")}
 
       set.seed(500)
 
       pred_stn <- predict(model, w %>% st_drop_geometry() %>% select(wetland_sum_perc,
                                                                                 lake_sum_perc,
                                                                                 glacier_sum_perc,
-                                                                                # area_km2,
+                                                                                area_km2,
                                                                                 MAT,
                                                                                 MAP,
                                                                                 dem_p025,
@@ -49,6 +49,8 @@ pred_Q_findRef <- function(w = new_ws2_forRF(), force_station = NULL){
                                                                                 LONGITUDE,
                                                                                 LATITUDE))$predictions
       pred_stn <- data.frame(prob = t(pred_stn)) %>% mutate(id = row_number()) %>% arrange(-prob)
+
+      # print(pred_stn[1:10,] %>% left_join(stn_training %>% mutate(id = row_number())))
 
       pred_stn <- pred_stn[1,]$id
       #print(pred_stn)
@@ -65,8 +67,8 @@ pred_Q_findRef <- function(w = new_ws2_forRF(), force_station = NULL){
 pred_Q_rf <- function(w = new_ws2_forRF(), force_station = ref_stn, wsc_STATION_NUMBER = NULL){
 
   #print(paste("force_station",force_station))
-  print("w")
-  print(w)
+  # print("w")
+  # print(w)
   # t <- st_read(conn, query = paste0("SELECT * FROM wsc_dayly_longterm_20240204"))
   # t %>% as_tibble() %>% pull(station_number) %>% unique()
   # ref_wsc_daily <- st_read(conn, query = paste0("SELECT * FROM daily_wsc_clean_20240205 WHERE station_number = '07EF001'"))
@@ -83,28 +85,32 @@ pred_Q_rf <- function(w = new_ws2_forRF(), force_station = ref_stn, wsc_STATION_
   #print(paste("target_mad",target_mad))
 
   target_mad_ts <- ref_wsc_daily %>%
-    mutate(mean_mad = mean_mad_perc*target_mad,
-           p95_mad = p95_mad_perc*target_mad,
-           p5_mad = p5_mad_perc*target_mad) %>%
-    select(dayof_year, mean_mad, p5_mad, p95_mad)
+    mutate(`LT Mean` = mean_mad_perc*target_mad,
+           `LT 95th` = p95_mad_perc*target_mad,
+           `LT 5th` = p5_mad_perc*target_mad) %>%
+    select(dayof_year, `LT Mean`, `LT 95th`, `LT 5th`)
 
-  print("plotting")
-  pppp <- target_mad_ts %>%
+  # print("plotting")
+  (pppp <- target_mad_ts %>%
     pivot_longer(cols = -dayof_year) %>%
     ggplot() +
-    geom_line(aes(dayof_year, value, color = name)) +
-    scale_color_manual(values = c("#000000","#D53E4F","blue")) +
+    geom_line(aes(dayof_year, value, color = name, linetype = name)) +
+    geom_hline(aes(yintercept = target_mad, linetype = "MAD", color = "MAD")) +
+    geom_text(aes(x = 50, y = target_mad, label = paste0("MAD: ", signif(target_mad,4)))) +
+    scale_linetype_manual(values = c(1,1,1,2)) +
+    scale_color_manual(values = c("blue","#D53E4F","black", "green")) +
     scale_x_continuous(expand = c(0,0)) +
     scale_y_continuous(expand = c(0,0)) +
     labs(x = "Day",
          y = "Estimated Mean Daily Q (cms)",
          color = "Estimate Percentiles",
+         linetype = "Estimate Percentiles",
          title = paste0("Model v3 [WSC reference station: ", force_station,", ", w$regulated,"]")) +
-    theme_bw()
+    theme_bw())
 
   if(is.null(wsc_STATION_NUMBER)){
     # style(ggplotly(pppp, dynamicTicks = T, width = 900), visible="legendonly", traces = c(1,7))
-    print("plotting null")
+    # print("plotting null")
 
     ggplotly(pppp, dynamicTicks = T, width = 800)
   }else{
