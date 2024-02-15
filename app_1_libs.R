@@ -44,5 +44,6 @@ library(DT)
 # MODELS
 library(randomForest)
 library(readr)
+library(shinyBS)
 
-  })
+})
