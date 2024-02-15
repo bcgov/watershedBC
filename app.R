@@ -2,68 +2,49 @@
 
   rm(list=ls())
 
-# LOAD LIBRARIES ###############################################################
+# LOAD FUNCTIONS #######
 
   source("app_1_libs.R")
-
-# CONNECT TO DATABASE ##########################################################
-
   source("app_2_db.R")
-
-# LOAD BASELINE DATSETS ########################################################
-
   source("app_3_load_dat.R")
-
-# DISCHARGE FUNCTIONS ##########################################################
-
   source("app_4_discharge_matchStn_forceUpdate.R")
-
-# BASEMAP ######################################################################
-
   source("app_5_leaflet.R")
+  source("app_7_tooltips.R")
 
 # UI ###########################################################################
 
-ui <- tagList(useShinyjs(), navbarPage(theme = "css/bcgov.css", title = "watershedBC (v0.1 Beta Testing)", tabPanel(title = "watershedBC (v0.1 Beta Testing)",
+ui <- tagList(useShinyjs(), navbarPage(theme = "css/bcgov.css", title = "watershedBC (v0.1 Beta Testing)",
 
-  modalDialog(
-    HTML("Welcome to watershedBC, an experimental research tool that is in <u>active development</u>.
-          The tool is designed to summarize watershed data and estimate streamflow. Before you proceed,
-          please read the following disclaimer:<br><br>
-          <ul>
-            <li><b><u>Prototype:</u></b> watershedBC is a prototype. There are multiple known issues and innacuracies that are actively being worked on.</li><br>
-            <li><b><u>Not validated:</u></b> At this time, do not use any information from watershedBC for decision making.</li><br>
-            <li><b><u>Frequent outages:</u></b> This tool is a proof of concept and will periodically be offline, freeze, or crash.</li><br>
-            <li><b><u>User responsibility:</u></b> The User is responsible for the safe interpretation of the datasets presented.</li><br>
-            <li><b><u>Open source:</u></b> The goal of this project is to be openly transparent via <a href='https://github.com/bcgov/watershedBC/', target='_blank'>https://github.com/bcgov/watershedBC/</a></li><br>
-            <li><b><u>Speed:</u></b> This tool slows down with more concurent users. This will be fixed in future versions.</li><br>
-            <li><b><u>Feedback:</u></b> Users can provide feedback here: <a href='https://github.com/bcgov/watershedBC/issues/', target='_blank'>https://github.com/bcgov/watershedBC/issues/</a></li><br>
-          </ul>"),
-    title = "Disclaimer: watershedBC is a prototype", size = "m", easyClose = FALSE, footer = modalButton("I accept the disclaimer")),
+  tabPanel(title = "watershedBC (v0.1 Beta Testing)",
+
+  modalDialog(HTML(tooltip_startup_popup),
+              title = "Disclaimer: watershedBC is a prototype", size = "m", easyClose = FALSE, footer = modalButton("I accept the disclaimer")),
 
   shiny::fluidRow(
     shiny::column(width = 2,
+
       shiny::h3("Get started"),
       shiny::HTML("1 - Click anywhere in BC to get started<br>
                    2 - Click 'Run Report'<br>
                    3 - Be patient!"), br(), br(),
 
-      shiny::radioButtons(inputId = "watershed_source",
-        label = "Watershed Data Source",
-        selected = "Freshwater Atlas Named Watersheds",
-        choices = c("Freshwater Atlas Named Watersheds",
-                    "Freshwater Atlas by Stream Order",
-                    "Custom Basin at Point of Interst",
-                    "Water Survey of Canada Basins")),
-
       shiny::selectizeInput(inputId = "psql_zoom_to_name",
-        label = "Or search watersheds by name",
-        choices = NULL,
-        selected = "",
-        multiple = F),
+                            label = "Select Watershed by Name",
+                            choices = NULL,
+                            selected = "", multiple = F),
 
       shiny::actionButton(inputId = "zoom_to_button",
-        label = "Zoom to.."),br(),br(),
+                          label = "Zoom to..", icon("paper-plane"),
+                          style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),br(),br(),
+
+      shiny::radioButtons(inputId = "watershed_source",
+        label = "Or Select a Data Source and click the map",
+        selected = "Freshwater Atlas Named Watersheds",
+        choices = c("Freshwater Atlas Named Watersheds", "Freshwater Atlas by Stream Order", "Custom Basin at Point of Interst", "Water Survey of Canada Basins")),
+        radioTooltip(id = "watershed_source", choice = "Freshwater Atlas Named Watersheds", title = "Larger named systems that are mapped in the Freshwater Atlas of BC", placement = "right", trigger = "hover"),
+        radioTooltip(id = "watershed_source", choice = "Freshwater Atlas by Stream Order", title = "Every watershed in the Freshwater Atlas of BC summarized by stream order", placement = "right", trigger = "hover"),
+        radioTooltip(id = "watershed_source", choice = "Custom Basin at Point of Interst", title = "Custom watersheds at every 1 km interval on every system in BC", placement = "right", trigger = "hover"),
+        radioTooltip(id = "watershed_source", choice = "Water Survey of Canada Basins", title = "Watersheds for WSC Hydrometric Stations", placement = "right", trigger = "hover"),
 
       shiny::checkboxGroupInput(inputId = "run_modules",
         label = "Include in Watershed Report",
@@ -74,15 +55,21 @@ ui <- tagList(useShinyjs(), navbarPage(theme = "css/bcgov.css", title = "watersh
                     "Stream Profile",
                     "Water Allocations",
                     "ClimateBC",
-                    "Satellite Imagery"))),
+                    "Satellite Imagery")),
+    shiny::actionButton(inputId = "run_button",
+                        label = "Run Watershed Report", icon("paper-plane"),
+                        style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
+
+    textOutput(outputId = "ws_run"),
+    textOutput(outputId = "ws_selection_pred_time")),
 
     shiny::column(width = 10,
-      leafletOutput("mymap", height = '700px') %>% withSpinner(color = "steelblue"),
+      leafletOutput("mymap", height = '800px') %>% withSpinner(color = "steelblue"),
       checkboxInput(inputId = "active_mouse", label = "Watershed Delineation on Map Click", value = T, ),
       h3(textOutput(outputId = "ws_selection")),
-      actionButton(inputId = "run_button", label = "Run Report"),
-      textOutput(outputId = "ws_run"),
-      textOutput(outputId = "ws_selection_pred_time"),
+      # actionButton(inputId = "run_button", label = "Run Report"),
+      # textOutput(outputId = "ws_run"),
+      # textOutput(outputId = "ws_selection_pred_time"),
       tableOutput('table_named'),
       downloadButton("downloadWatershed", "Watershed"),
       plotlyOutput("plot_discharge"),
@@ -136,20 +123,23 @@ ui <- tagList(useShinyjs(), navbarPage(theme = "css/bcgov.css", title = "watersh
             tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/privacy", "Privacy", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
             tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/accessibility", "Accessibility", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
             tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/copyright", "Copyright", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
-            tags$li(a(href = "https://www2.gov.bc.ca/StaticWebResources/static/gov3/html/contact-us.html", "Contact", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;"))))))))
+            tags$li(a(href = "https://www2.gov.bc.ca/StaticWebResources/static/gov3/html/contact-us.html", "Contact", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")))))))),
+  tabPanel(title = "Data Sources and Methods",
+           "Coming soon.."
+           )
   ))
 
 # SERVER #######################################################################
 
 server <- function(input, output, session) {
 
-  ## ADD LIST TO
+  ## ADD LIST TO SEARCH BY NAME
   updateSelectizeInput(session, 'psql_zoom_to_name', choices = c("", names$name), server = TRUE)
 
-  ## HIDE PLOTS ON START
+  ## HIDE PLOTS ON START (GETS RID OF WHITESPACE) NEED TO KEEP app_6 up to date with new plot names
   source("app_6_hidereport.R")
 
-  ## RECORD SESSION INFO
+  ## RECORD SESSION INFO - FOR TRACKINGS
   session_start <- Sys.time() %>% format(tz="UTC")
   session_token <- session$token
 
@@ -396,25 +386,6 @@ server <- function(input, output, session) {
 
         # START PROGRESS
         withProgress(message = 'Processing...', max = 15,  {
-
-
-# SOILS ####
-#
-#
-#
-#   terra::mask(parent, vect(new_ws2)) %>% plot
-#     parent %>% terra::
-# # "Glaciolacustrine",
-# # "Till",
-# # "Organic	O
-# #   13	Rock	R
-# #   14	Undifferentiated	U
-# #   15	Volcanic	V
-# #   16	Marine	W
-# #   17	Glaciomarine	WG
-# #   18	Water	N
-#
-#
 
 # DEM STATISTICS ####
 
@@ -1375,8 +1346,8 @@ server <- function(input, output, session) {
                          label = paste0(wsc_pp_ac$name, " - ", wsc_pp_ac$stationnum, " [active]")) %>%
         addCircleMarkers(data = wsc_pp_dc, lng = wsc_pp_dc$lon, lat = wsc_pp_dc$lat, color = "grey", radius = 3, group = "WSC Discontinued",
                          label = paste0(wsc_pp_dc$name, " - ", wsc_pp_dc$stationnum, " [discontinued]")) %>%
-        addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap"),
-                         overlayGroups = c("Sentinel 2023 (slow)", "Landsat 2020-2023 (slow)", "Landsat 1985-1990 (slow)", "WSC Active", "WSC Discontinued"),
+        addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap", "Landsat 2000", "Landsat 2021"),
+                                        overlayGroups = c("WSC Active", "WSC Discontinued"),
                          options = layersControlOptions(collapsed = F))
     }
     else{new_leaflet <- initial_map}
@@ -1429,8 +1400,8 @@ server <- function(input, output, session) {
     output$mymap <- renderLeaflet({
       new_leaflet %>%
         addPolygons(data = new_ws2 %>% st_transform(4326), fillOpacity = 0, weight = 2, color = "blue") %>%
-        addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap"),
-                         overlayGroups = c("Sentinel 2023 (slow)", "Landsat 2020-2023 (slow)", "Landsat 1985-1990 (slow)", "WSC Active", "WSC Discontinued",
+        addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap", "Landsat 2000", "Landsat 2021"),
+                         overlayGroups = c("WSC Active", "WSC Discontinued",
                                            "FWA Wetland", "FWA Lake", "FWA Glacier", "Glacier 1985", "Glacier 2021",
                                            "Fire", "Cutblock", "Roads", "Water Rights", "Water Approvals"),
                          options = layersControlOptions(collapsed = F)) %>%
@@ -1467,8 +1438,10 @@ server <- function(input, output, session) {
   output$ws_run <- renderText({time})
   output$ws_selection_pred_time <- renderText({"Processing complete!"})
 
-  # shinyjs::show('export_pdf')
-  # conn <- refresh()
+  observeEvent(input$downloadPDF, {
+    shinyscreenshot::screenshot(filename = paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, ".png"))
+  })
+
 
   dbWriteTable(conn, "usage",
                data.frame(date_time = as.character(session_start),
@@ -1490,6 +1463,7 @@ server <- function(input, output, session) {
 shinyApp(ui, server)
 
 # lapply(DBI::dbListConnections(RPostgres::dbDriver("PostgreSQL")), function(i){
+#   print(i)
 #   DBI::dbDisconnect(i)})
 # # EXPORT PDF ####
 # output$export_pdf <- downloadHandler(
