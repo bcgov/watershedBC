@@ -41,10 +41,11 @@ ui <- tagList(useShinyjs(), navbarPage(theme = "css/bcgov.css", title = "watersh
         label = "Or Select a Data Source and click the map",
         selected = "Freshwater Atlas Named Watersheds",
         choices = c("Freshwater Atlas Named Watersheds", "Freshwater Atlas by Stream Order", "Custom Basin at Point of Interst", "Water Survey of Canada Basins")),
-        radioTooltip(id = "watershed_source", choice = "Freshwater Atlas Named Watersheds", title = "Larger named systems that are mapped in the Freshwater Atlas of BC", placement = "right", trigger = "hover"),
-        radioTooltip(id = "watershed_source", choice = "Freshwater Atlas by Stream Order", title = "Every watershed in the Freshwater Atlas of BC summarized by stream order", placement = "right", trigger = "hover"),
-        radioTooltip(id = "watershed_source", choice = "Custom Basin at Point of Interst", title = "Custom watersheds at every 1 km interval on every system in BC", placement = "right", trigger = "hover"),
-        radioTooltip(id = "watershed_source", choice = "Water Survey of Canada Basins", title = "Watersheds for WSC Hydrometric Stations", placement = "right", trigger = "hover"),
+
+        radioTooltip(id = "watershed_source", choice = "Freshwater Atlas Named Watersheds", title = "Large named systems in the Freshwater Atlas (n = 11.5k)", placement = "right", trigger = "hover"),
+        radioTooltip(id = "watershed_source", choice = "Freshwater Atlas by Stream Order", title = "Watershed units in the Freshwater Atlas summarized by stream order (n = 1.35 million)", placement = "right", trigger = "hover"),
+        radioTooltip(id = "watershed_source", choice = "Custom Basin at Point of Interst", title = "Custom watersheds at every 1 km (n = 946k)", placement = "right", trigger = "hover"),
+        radioTooltip(id = "watershed_source", choice = "Water Survey of Canada Basins", title = "WSC Hydrometric Stations (n = 2.9k)", placement = "right", trigger = "hover"),
 
       shiny::checkboxGroupInput(inputId = "run_modules",
         label = "Include in Watershed Report",
@@ -57,7 +58,7 @@ ui <- tagList(useShinyjs(), navbarPage(theme = "css/bcgov.css", title = "watersh
                     "ClimateBC",
                     "Satellite Imagery")),
     shiny::actionButton(inputId = "run_button",
-                        label = "Run Watershed Report", icon("paper-plane"),
+                        label = "Run Report", icon("paper-plane"),
                         style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
 
     textOutput(outputId = "ws_run"),
@@ -180,8 +181,8 @@ server <- function(input, output, session) {
             "SELECT * FROM fwa_named
              WHERE ST_Intersects(geom, ST_Transform(ST_SetSRID(ST_MakePoint(",point_df$lng,",",point_df$lat,"), 4326),3005))
              ORDER BY area_m2 ASC LIMIT 1"))
-          bas <- bas %>% st_cast("POLYGON", warn = F)
           if(nrow(bas) > 0) {
+            bas <- bas %>% st_cast("POLYGON", warn = F)
             bas <- bas %>% mutate(area_km2 = area_m2 / (1000 * 1000))}
           }
 
@@ -231,12 +232,13 @@ server <- function(input, output, session) {
               st_transform(crs = 3005)}
           }
 
-        # ADD 3005 LAT/LON FOR RF
-        bas_4326 <- bas %>% st_transform(4326)
-        new_ws(bas)
 
         # UPDATE MAP WITH SELECTED WATERSHED
         if(nrow(bas) > 0) {
+
+          # ADD 3005 LAT/LON FOR RF
+          bas_4326 <- bas %>% st_transform(4326)
+          new_ws(bas)
 
           output$ws_selection <- renderText({paste0("You selected ", new_ws()$gnis_name, " (", format(round(as.numeric(new_ws()$area_km2), 0), big.mark = ",") ," sq.km)")})
           output$ws_selection_pred_time <- renderText({paste0("Estimated time to run a full report ~ ", 0.5 + round((new_ws()$area_km2 * 0.03) / 60, 1)," min")})
@@ -246,12 +248,13 @@ server <- function(input, output, session) {
           leafletProxy("mymap") %>%
             leaflet::clearGroup("Watershed")
 
-          leafletProxy("mymap") %>%
+          leafletProxy("mymap") %>% # initial_map %>%
             leaflet::clearGroup("FWA Wetland") %>% leaflet::clearGroup("FWA Lake") %>% leaflet::clearGroup("FWA Glacier") %>%
             leaflet::clearGroup("Glacier 1985") %>% leaflet::clearGroup("Glacier 2021") %>%
             leaflet::clearGroup("Fire") %>% leaflet::clearGroup("Cutblock") %>% leaflet::clearGroup("Roads") %>%
             leaflet::clearGroup("Water Rights") %>% leaflet::clearGroup("Approvals") %>%
-            addPolygons(data = bas_4326, fillOpacity = 0, weight = 2, color = "blue", group = "Watershed")}
+            addPolygons(data = bas_4326,  weight = 2, fillColor = "green", fillOpacity = 0, color = "blue", group = "Watershed")
+          }
 
         tictoc <- toc(quiet = T)$callback_msg
 
@@ -1355,8 +1358,8 @@ server <- function(input, output, session) {
     if("Forest Disturbance" %in% input$run_modules){
       new_leaflet <- new_leaflet %>%
         addPolylines(data = dra %>% st_transform(4326), group = "Roads", fillColor = "black", color = "black", weight = 1, fillOpacity = 1, label = dra$transport_line_surface_code_desc) %>%
-        addPolygons(data = my_wf %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Fire", fillColor = "red", color = "red", weight = 2, opacity = 1, fillOpacity = 0.3, label = paste0("Fire year:", my_wf$fire_year)) %>%
-        addPolygons(data = my_cb %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Cutblock", fillColor = "darkgreen", color = "darkgreen", weight = 1, fillOpacity = 0.3, label = paste("Harvest year:", my_cb$harvest_year))}
+        addPolygons(data = my_wf %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Fire", fillColor = "red", color = "red", weight = 2, opacity = 1, fillOpacity = 0.8, label = paste0("Fire year:", my_wf$fire_year)) %>%
+        addPolygons(data = my_cb %>% filter(clipped_area_m2 > 0) %>% st_transform(4326), group = "Cutblock", fillColor = "darkgreen", color = "darkgreen", weight = 1, fillOpacity = 0.8, label = paste("Harvest year:", my_cb$harvest_year))}
 
     # if("CEF Human Disturbance - 2021" %in% input$run_modules){
     #   new_leaflet <- new_leaflet %>%
@@ -1438,10 +1441,28 @@ server <- function(input, output, session) {
   output$ws_run <- renderText({time})
   output$ws_selection_pred_time <- renderText({"Processing complete!"})
 
-  observeEvent(input$downloadPDF, {
-    shinyscreenshot::screenshot(filename = paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, ".png"))
-  })
+  # observeEvent(input$downloadPDF, {
+    # shinyscreenshot::screenshot(filename = paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, ".png"))
+  # })
 
+  output$downloadPDF <- downloadHandler(
+    filename = "report.pdf",
+    content = function(file) {
+      # params <- list(params = list(new_ws2 = new_ws2))
+      # id <- showNotification(
+      #   "Rendering report...",
+      #   duration = NULL,
+      #   closeButton = FALSE
+      # )
+      # on.exit(removeNotification(id), add = TRUE)
+
+      rmarkdown::render("report.Rmd",
+                        output_file = file,
+                        params = list(new_ws2 = new_ws()),
+                        envir = new.env(parent = globalenv())
+      )
+    }
+  )
 
   dbWriteTable(conn, "usage",
                data.frame(date_time = as.character(session_start),
