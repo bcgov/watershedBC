@@ -394,8 +394,7 @@ server <- function(input, output, session) {
 
   incProgress(1, detail = "Get DEM...")
 
-  dem <- terra::rast("/vsicurl/https://bcbasin.s3.ca-central-1.amazonaws.com/COP_GLO30_FOR_watershedBC_cog.tif",
-                     win = terra::ext(new_ws2_4326))
+  dem <- terra::rast("/vsicurl/https://bcbasin.s3.ca-central-1.amazonaws.com/COP_GLO30_FOR_watershedBC_cog.tif", win = terra::ext(new_ws2_4326))
   dem <- terra::mask(dem, vect(new_ws2_4326))
   dem_v <- dem %>% as_tibble() %>% pull(COP_GLO30_FOR_watershedBC_cog)
   dem_quant <- data.frame(dem = quantile(dem_v, probs = seq(0,1,0.01), na.rm = T), quant = rev(seq(0,1,0.01))*100)
@@ -415,13 +414,15 @@ server <- function(input, output, session) {
   output$plot_hypsometry <- renderPlotly({
     ggplotly(
       dem_quant %>% ggplot() +
-        geom_hline(aes(yintercept = h60), alpha = 0.6) +
-        geom_line(aes(quant, dem), color = "steelblue") +
+        geom_hline(aes(yintercept = h60, color = "h60"), linetype = 2) +
+        geom_line(aes(quant, dem, color = "hypsometry")) +
         geom_text(aes(90, h60*1.05, label = paste0("h60: ", h60," m"))) +
         theme_bw() +
         scale_x_continuous(expand = c(0,0)) +
         scale_y_continuous(expand = c(0,0)) +
-        labs(x = "Area (%)", y = "Elevation (m)", title = paste0("Basin Hypsometry [Melton Ratio: ", round(melton,2),"]"))
+        scale_color_manual(values = c("black", "steelblue")) +
+        labs(x = "Area (%)", y = "Elevation (m)", title = paste0("Basin Hypsometry [Melton Ratio: ", round(melton,2),"]"),
+             color = "")
       , dynamicTicks = T, width = 800)
     })
 
@@ -588,11 +589,13 @@ server <- function(input, output, session) {
                   theme_bw() +
                  labs(x = "", y = "Length km", title = paste0("Total Road Length ", round(dra$length_km %>% sum(), 1), " km"), fill = "") +
                  scale_y_continuous(n.breaks = 10)
-               , dynamicTicks = T, width = 800 ) })
+               , dynamicTicks = T, width = 800 )
+    })
 
     output$text_plot_dra <- renderText({
       paste0("<br><b>Total Road Length: ", round(dra$length_km %>% sum(), 1), " km</b>. Roads are calculated from the <a href='https://www2.gov.bc.ca/gov/content/data/geographic-data-services/topographic-data/roads'>
-              Digital Road Atlas</a> of BC.<br><br><br>")})
+              Digital Road Atlas</a> of BC.<br><br><br>")
+      })
 
     # FORESTS ####
 
@@ -623,16 +626,19 @@ server <- function(input, output, session) {
         mutate(eca = case_when(eca < 0 ~ 0, TRUE ~ eca))}))
 
     output$plot_eca <- renderPlotly({
-      ggplotly(e %>% mutate(eca_area = (eca / 100) * area, eca_area_ws_perc = 100 * (eca_area / ws_area)) %>% group_by(type, year) %>%
+      ggplotly(
+        e %>% mutate(eca_area = (eca / 100) * area, eca_area_ws_perc = 100 * (eca_area / ws_area)) %>% group_by(type, year) %>%
                  summarize(eca = sum(eca_area_ws_perc, na.rm = T)) %>% mutate(eca = signif(eca, 3)) %>%
+          group_by(year) %>% mutate(total_eca = sum(eca)) %>%
                  ggplot() +
-                   geom_col(aes(year, eca, fill = type)) +
+                   geom_col(aes(year, eca, fill = type, group = total_eca)) +
                    theme_bw() +
                    scale_y_continuous(n.breaks = 10) +
                    scale_x_continuous(n.breaks = 10) +
                    labs(x = "Year", y = "ECA (%)", title = "Simplified ECA") +
                    scale_fill_manual(values = c("darkgreen", "orange")),
-               dynamicTicks = T, width = 800)})
+               dynamicTicks = T, width = 800)
+      })
 
     output$text_plot_eca <- renderText({
       "<br><b> Equivalent Clearcut Area (ECA)</b> is a basin-wide statistic that is the sum of the total area of all forest disturbance
@@ -657,7 +663,8 @@ server <- function(input, output, session) {
                    scale_fill_manual(values = c("darkgreen", "orange")) +
                    scale_y_continuous(n.breaks = 10) +
                    scale_x_continuous(n.breaks = 10)
-               , dynamicTicks = T, width = 800)})
+               , dynamicTicks = T, width = 800)
+      })
 
     output$text_plot_timeseries <- renderText({
       "<br>The <b>Forest Disturbance History</b> is the total forest disturbance by year. Data is from the <a href='https://catalogue.data.gov.bc.ca/dataset/harvested-areas-of-bc-consolidated-cutblocks-'>
@@ -682,7 +689,8 @@ server <- function(input, output, session) {
                  scale_fill_manual(values = c("darkgreen", "orange")) +
                  scale_y_continuous(n.breaks = 10) +
                  scale_x_continuous(n.breaks = 10)
-               , dynamicTicks = T, width = 800)})
+               , dynamicTicks = T, width = 800)
+      })
 
     output$text_plot_timeseries_cumsum <- renderText({
       "<br>The <b>Cumulative Forest Disturbance History</b> is the total forest disturbance by year, accumulated over time. As such, it is possible to have a cumulative forest disturbance
@@ -1345,6 +1353,7 @@ server <- function(input, output, session) {
       wsc_pp_dc <- wsc_pp %>% filter(status == "discontinued") %>% mutate(id = stationnum)
 
       new_leaflet <- initial_map %>%
+        addPolygons(data = new_ws2 %>% st_transform(4326), fillOpacity = 0, weight = 2, color = "blue") %>%
         addCircleMarkers(data = wsc_pp_ac, lng = wsc_pp_ac$lon, lat = wsc_pp_ac$lat, color = "steelblue", radius = 3, group = "WSC Active",
                          label = paste0(wsc_pp_ac$name, " - ", wsc_pp_ac$stationnum, " [active]")) %>%
         addCircleMarkers(data = wsc_pp_dc, lng = wsc_pp_dc$lon, lat = wsc_pp_dc$lat, color = "grey", radius = 3, group = "WSC Discontinued",
@@ -1353,7 +1362,8 @@ server <- function(input, output, session) {
                                         overlayGroups = c("WSC Active", "WSC Discontinued"),
                          options = layersControlOptions(collapsed = F))
     }
-    else{new_leaflet <- initial_map}
+    else{new_leaflet <- initial_map %>%
+      addPolygons(data = new_ws2 %>% st_transform(4326), fillOpacity = 0, weight = 2, color = "blue")}
 
     if("Forest Disturbance" %in% input$run_modules){
       new_leaflet <- new_leaflet %>%
@@ -1402,7 +1412,6 @@ server <- function(input, output, session) {
 
     output$mymap <- renderLeaflet({
       new_leaflet %>%
-        addPolygons(data = new_ws2 %>% st_transform(4326), fillOpacity = 0, weight = 2, color = "blue") %>%
         addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap", "Landsat 2000", "Landsat 2021"),
                          overlayGroups = c("WSC Active", "WSC Discontinued",
                                            "FWA Wetland", "FWA Lake", "FWA Glacier", "Glacier 1985", "Glacier 2021",
