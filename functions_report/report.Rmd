@@ -3,6 +3,7 @@ title: "Watershed Report"
 author: "watershedBC"
 date: "`r format(Sys.time(), '%Y-%m-%d %H:%m %Z')`"
 output: pdf_document
+always_allow_html: true
 params: 
   new_leaflet2: NA
   gg_plot_discharge2: NA
