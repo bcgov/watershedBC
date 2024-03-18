@@ -73,7 +73,7 @@ for(p in periods){
 
 l <- list.files(wd, recursive = F, full.names = T, pattern = "*.tif$")
 
-stars::read_stars(l, along = "band") %>% write_stars("C:/Users/bevington/Downloads/test/climateBC.tif")
+stars::read_stars(l, along = "band") %>% write_stars("climateBC.tif")
 
 terra::rast("/vsicurl/https://bcbasin.s3.ca-central-1.amazonaws.com/climateBC.tif")
 

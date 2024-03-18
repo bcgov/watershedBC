@@ -1,0 +1,22 @@
+---
+title: "Watershed Report"
+author: "watershedBC"
+date: "`r format(Sys.time(), '%Y-%m-%d %H:%m %Z')`"
+output: pdf_document
+params: 
+  gg_hyps2: NA
+---
+
+```{r setup}
+knitr::opts_chunk$set(echo = F)
+```
+
+## R Markdown
+
+
+This is a watershed report.... 
+
+```{r dischar}
+params$gg_hyps2
+```
+
