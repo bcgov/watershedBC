@@ -66,19 +66,27 @@ ui <- tagList(useShinyjs(), navbarPage(theme = "css/bcgov.css", title = "watersh
                           style="color: #fff; background-color: #337ab7; border-color: #2e6da4"),
 
       textOutput(outputId = "ws_run"),
-      textOutput(outputId = "ws_selection_pred_time")),
+      textOutput(outputId = "ws_selection_pred_time"),
+      br(),
+      br(),
+      downloadButton("downloadPDF", "Export PDF"),br(),
+      downloadButton("downloadWatershed", "Watershed"),br(),
+      # downloadButton("downloadSpatial", "Spatial"),br(),
+      # downloadButton("downloadDEM", "DEM"),br(),
+      # downloadButton("downloadDischarge", "Discharge"),br(),
+      downloadButton("downloadImagery1985", "Imagery - L5 1985"),br(),
+      downloadButton("downloadImagery2020", "Imagery - L8 2020"),br(),
+      downloadButton("downloadImagery2023", "Imagery - S2 2023"),br(),
+    ),
 
       shiny::column(width = 10,
         leafletOutput("mymap", height = '700px') %>% withSpinner(color = "steelblue"),
         checkboxInput(inputId = "active_mouse", label = "Watershed Delineation on Map Click", value = T, ),
         h3(textOutput(outputId = "ws_selection")),
         tableOutput('table_named'),
-        downloadButton("downloadWatershed", "Watershed"),
         plotlyOutput("plot_discharge"),
-        shiny::selectInput(inputId = "plot_discharge_site_sel",
-                           label = "Override Reference Station for Streamflow Estimation",
-                           choices = stn_training$total_name,
-                           width = "600px"),
+        shiny::selectInput(inputId = "plot_discharge_site_sel", label = "Override WSC Reference Station for Streamflow Estimation",
+                           choices = stn_training$total_name, width = "600px"),
         leafletOutput("map_discharge_ref", height = '400px', width = "600px"),
         htmlOutput("text_plot_discharge"),
         plotlyOutput("plot_hypsometry"), htmlOutput("text_plot_hypsometry"),
@@ -96,15 +104,8 @@ ui <- tagList(useShinyjs(), navbarPage(theme = "css/bcgov.css", title = "watersh
         plotlyOutput("plot_map"), htmlOutput("text_plot_map"),
         plotlyOutput("plot_cmd"), htmlOutput("text_plot_cmd"),
         plotOutput("plot_landsat_1985", width = 800, height = 800),
-        downloadButton("downloadImagery1985", "Imagery - L5 1985"),
         plotOutput("plot_landsat_2020", width = 800, height = 800),
-        downloadButton("downloadImagery2020", "Imagery - L8 2020"),
         plotOutput("plot_sentinel_2023", width = 800, height = 800),
-        downloadButton("downloadImagery2023", "Imagery - S2 2023"),br(),br(),
-        downloadButton("downloadPDF", "Export PDF"),
-        # downloadButton("downloadSpatial", "Spatial"),
-        # downloadButton("downloadDEM", "DEM"),
-        # downloadButton("downloadDischarge", "Discharge"),
         br(),br(),br(),br())),
 
   shiny::fluidRow(
@@ -127,8 +128,7 @@ ui <- tagList(useShinyjs(), navbarPage(theme = "css/bcgov.css", title = "watersh
             tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/copyright", "Copyright", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
             tags$li(a(href = "https://www2.gov.bc.ca/StaticWebResources/static/gov3/html/contact-us.html", "Contact", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")))))))),
   tabPanel(title = "Data and methods",
-           "Coming soon.."
-           ),
+           "Coming soon.."),
   navbarMenu("Other experimental apps",
            HTML("<a href = 'http://bcgov-env.shinyapps.io/nbchydro/', target = '_blank'>Northern BC Hydrology Research</a>"),
            HTML("<a href = 'http://bcgov-env.shinyapps.io/nbcclim/', target = '_blank'>Northern BC Climate Research</a>"),
@@ -154,8 +154,9 @@ server <- function(input, output, session) {
   new_ws <- reactiveVal()
   basin_source <- reactiveVal()
   new_ws2_forRF <- reactiveVal()
+  gg_plot_discharge2 <- reactiveVal()
 
-  ## ADD INITAL BASEMAP OVER BC
+## ADD INITAL BASEMAP OVER BC
   output$mymap <- renderLeaflet({initial_map %>% fitBounds(-140, 48, -113, 60)})
 
 # OPTION 1: CLICK MAP TO SELECT WATERSHED ####
@@ -365,7 +366,7 @@ server <- function(input, output, session) {
 
       if(input$watershed_source == "Water Survey of Canada Basins"){
         gg_plot_discharge <- pred_Q_rf(w = new_ws2_forRF(), force_station = my_force_station, wsc_STATION_NUMBER = new_ws()$gnis_id)
-        # saveRDS(gg_plot_discharge,gg_plot_discharge_path())
+        gg_plot_discharge2(gg_plot_discharge)
 
         output$plot_discharge <- renderPlotly({
 
@@ -374,11 +375,11 @@ server <- function(input, output, session) {
           })
           }else{
             gg_plot_discharge <- pred_Q_rf(w = new_ws2_forRF(), force_station = my_force_station)
-            # saveRDS(gg_plot_discharge,gg_plot_discharge_path())
+            gg_plot_discharge2(gg_plot_discharge)
 
-        output$plot_discharge <- renderPlotly({
+            output$plot_discharge <- renderPlotly({
 
-          ggplotly(gg_plot_discharge, dynamicTicks = T, width = 800)
+              ggplotly(gg_plot_discharge, dynamicTicks = T, width = 800)
 
           })
           }})})
@@ -432,16 +433,17 @@ server <- function(input, output, session) {
 
   shinyjs::show("plot_hypsometry")
 
+  gg_hyps <- dem_quant %>% ggplot() +
+    geom_hline(aes(yintercept = h60, color = "h60"), linetype = 2) +
+    geom_line(aes(quant, dem, color = "hypsometry")) +
+    geom_text(aes(90, h60*1.05, label = paste0("h60: ", h60," m"))) +
+    theme_bw() +
+    scale_x_continuous(expand = c(0,0)) +
+    scale_y_continuous(expand = c(0,0)) +
+    scale_color_manual(values = c("black", "steelblue")) +
+    labs(x = "Watershed Area (%)", y = "Elevation (m)", title = paste0("Basin Hypsometry [Melton Ratio: ", round(melton,2),"]"), color = "")
+
   output$plot_hypsometry <- renderPlotly({
-    gg_hyps <- dem_quant %>% ggplot() +
-      geom_hline(aes(yintercept = h60, color = "h60"), linetype = 2) +
-      geom_line(aes(quant, dem, color = "hypsometry")) +
-      geom_text(aes(90, h60*1.05, label = paste0("h60: ", h60," m"))) +
-      theme_bw() +
-      scale_x_continuous(expand = c(0,0)) +
-      scale_y_continuous(expand = c(0,0)) +
-      scale_color_manual(values = c("black", "steelblue")) +
-      labs(x = "Watershed Area (%)", y = "Elevation (m)", title = paste0("Basin Hypsometry [Melton Ratio: ", round(melton,2),"]"), color = "")
     ggplotly(gg_hyps, dynamicTicks = T, width = 800)
     })
 
@@ -1431,7 +1433,7 @@ server <- function(input, output, session) {
 
 
     output$mymap <- renderLeaflet({
-      new_leaflet %>%
+      new_leaflet <- new_leaflet %>%
         addLayersControl(baseGroups = c("BC Basemap", "WorldImagery", "WorldTopoMap", "Landsat 2000", "Landsat 2021"),
                          overlayGroups = c("WSC Active", "WSC Discontinued",
                                            "FWA Wetland", "FWA Lake", "FWA Glacier", "Glacier 1985", "Glacier 2021",
@@ -1446,11 +1448,12 @@ server <- function(input, output, session) {
         addLegend("bottomright",
                   colors = c("yellow","steelblue","grey","brown","blue","red","darkgreen"),
                   labels = c("FWA Wetland","FWA Lake","FWA Glacier","Glacier 1985","Glacier 2021","Wildfire","Cutblock"),
-                  title = "Polygons", opacity = 1)})
+                  title = "Polygons", opacity = 1)
+      new_leaflet})
 
 # DOWNLOAD BUTTONS ####
 
-  output$downloadWatershed <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, "_watershed.sqlite")}, content = function(file) { st_write(new_ws2 %>% bind_rows(my_named), file)})
+  output$downloadWatershed <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, "_watershed.kml")}, content = function(file) { st_write(new_ws2 %>% bind_rows(my_named), file)})
   output$downloadImagery1985 <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, "_L5_1985.tif")}, content = function(file) { terra::writeRaster(r1985, file)})
   output$downloadImagery2020 <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, "_L8_2020.tif")}, content = function(file) { terra::writeRaster(r2020, file)})
   output$downloadImagery2023 <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, "_S2_2023.tif")}, content = function(file) { terra::writeRaster(r2023, file)})
@@ -1458,27 +1461,34 @@ server <- function(input, output, session) {
   output$downloadWetlands <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, "_wetlands.sqlite")}, content = function(file) { st_write(my_wl, file)})
   output$downloadLakes <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, "_lakes.sqlite")}, content = function(file) { st_write(my_lk, file)})
   output$downloadGlaciers <- downloadHandler(filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, "_glaciers.sqlite")}, content = function(file) { st_write(my_gl, file)})
+
   shinyjs::show("downloadPDF")
   shinyjs::show("downloadWatershed")
   shinyjs::show("downloadSpatial")
   shinyjs::show("downloadDEM")
   shinyjs::show("downloadDischarge")
 
-# TIME ####
+
+# DOWNLOAD PDF FUNCTION ####
+
+  output$downloadPDF <- downloadHandler(
+      filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, "_",format(Sys.time(), "%Y%m%d_%H%M%S"), ".pdf")},
+      content = function(file) {
+        render_report(my_params = list(
+          new_leaflet2 = new_leaflet,
+          gg_plot_discharge2 = gg_plot_discharge2(),
+          gg_hyps2 = gg_hyps))
+        print("copy")
+        file.copy(pdf_path, file)
+        })
+
+# TIMER STOP ####
 
   time <- paste0(round(as.numeric(as.numeric(strsplit(toc()$callback_msg, " ")[[1]][1]) / 60), 1), " minutes elapsed")
   output$ws_run <- renderText({time})
   output$ws_selection_pred_time <- renderText({"Processing complete!"})
 
-# DOWNLOAD PDF ####
-
-  output$downloadPDF <- downloadHandler(
-    filename = function() {paste0(gsub(" ", "-", new_ws2$gnis_name), "_", new_ws2$gnis_id, "_.pdf")},
-    content = function(file) {
-      render_report(input = report_path,
-                    output = pdf_path,
-                    params = list(gg_hyps2 = gg_hyps))
-      file.copy(pdf_path, file)})
+# WRITE USAGE TO DB ####
 
   dbWriteTable(conn, "usage",
                data.frame(date_time = as.character(session_start),
@@ -1489,8 +1499,6 @@ server <- function(input, output, session) {
                           action = "processing",
                           area_km2 = round(new_ws()$area_km2, 1),
                           basin_source = basin_source()), append = TRUE)
-
-
         })
       }
     }else{
