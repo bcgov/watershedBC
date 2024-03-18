@@ -126,9 +126,14 @@ ui <- tagList(useShinyjs(), navbarPage(theme = "css/bcgov.css", title = "watersh
             tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/accessibility", "Accessibility", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
             tags$li(a(href = "https://www2.gov.bc.ca/gov/content/home/copyright", "Copyright", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")),
             tags$li(a(href = "https://www2.gov.bc.ca/StaticWebResources/static/gov3/html/contact-us.html", "Contact", style ="font-size:1em; font-weight:normal; color:white; padding-left:5px; padding-right:5px; border-right:1px solid #4b5e7e;")))))))),
-  tabPanel(title = "Data Sources and Methods",
+  tabPanel(title = "Data and methods",
            "Coming soon.."
-           )
+           ),
+  navbarMenu("Other experimental apps",
+           HTML("<a href = 'http://bcgov-env.shinyapps.io/nbchydro/', target = '_blank'>Northern BC Hydrology Research</a>"),
+           HTML("<a href = 'http://bcgov-env.shinyapps.io/nbcclim/', target = '_blank'>Northern BC Climate Research</a>"),
+           HTML("<a href = 'http://bcgov-env.shinyapps.io/bcws_wx/', target = '_blank'>BC Wildfire Service Weather Station Data Visualization</a>"),
+           HTML("<a href = 'http://bcgov-env.shinyapps.io/bc_gw_tools/', target = '_blank'>Groundwater Well Tools</a>"))
   ))
 
 # SERVER #######################################################################
