@@ -1,12 +1,17 @@
 # rocker rshiny image: https://rocker-project.org/images/versioned/shiny.html
-FROM rocker/shiny
+# This image is quite large with dependencies ~2.30GB might look for alternatives.
+# in the future. rocker/shiny is most used shiny image
+FROM rocker/shiny AS base
 
 # dependencies needed for RPostgreSQL and sf
 RUN apt-get update && apt-get install -y \
     libpq-dev \
-    libudunits2-dev
+    libudunits2-dev \
+    libproj-dev \
+    libgdal-dev
 
-# R dependencies from ./functions_app/app_1_libs.R
+FROM base
+
 RUN R -e "install.packages(c('ranger', \
     'DBI', \
     'RPostgreSQL', \
@@ -34,7 +39,8 @@ RUN R -e "install.packages(c('ranger', \
     'randomForest', \
     'readr', \
     'shinyBS', \
-    'webshot'))"
+    'webshot', \
+    'RPostgres'))"
 
 # App working directory
 WORKDIR /watershed-app
@@ -45,5 +51,5 @@ COPY . .
 # Exposing default rshiny port
 EXPOSE 3838
 
-# running the app
+# Running the app
 CMD [ "Rscript", "app.R" ]
