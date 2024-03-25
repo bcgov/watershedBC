@@ -1,14 +1,15 @@
 
 
 # CONNECT DATABASE ####
-
+# Defaults values are for local development if one does not want to use
+# the watershedbc container and only the postgis db container. 
   conn <- pool::dbPool(
     drv = RPostgres::dbDriver("PostgreSQL"),
-    dbname = Sys.getenv("aw_dbname"),
-    host = Sys.getenv("aw_host"),
-    port = Sys.getenv("aw_port"),
-    user = Sys.getenv("aw_user"),
-    password = Sys.getenv("aw_password")
+    dbname = Sys.getenv("aw_dbname", "postgres"),
+    host = Sys.getenv("aw_host", "postgres"),
+    port = Sys.getenv("aw_port", "5432"),
+    user = Sys.getenv("aw_user", "postgres"),
+    password = Sys.getenv("aw_password", "postgres")
   )
 
 # POINT ####
