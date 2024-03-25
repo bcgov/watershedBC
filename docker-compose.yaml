@@ -1,0 +1,55 @@
+services:
+  postgis:
+    image: postgis/postgis:alpine
+    restart: always
+    ports:
+      - 5432:5432
+    volumes:
+      - ./:/tmp
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=public
+    networks:
+      - backend
+  
+  pgadmin:
+    image: dpage/pgadmin4
+    container_name: pgadmin4
+    restart: always
+    ports:
+      - "8001:80"
+    environment:
+      PGADMIN_DEFAULT_EMAIL: admin@admin.com
+      PGADMIN_DEFAULT_PASSWORD: 1234
+    networks:
+      - frontend
+      - backend
+    depends_on:
+      - postgis
+
+  watershedbc:
+    image: watershedbc
+    restart: always
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - 8000:3838
+    volumes:
+      - ./:/watershed-app
+    environment:
+      - AW_DBNAME=public
+      - AW_HOST=postgis
+      - AW_PORT=5432
+      - AW_USER=postgres
+      - AW_PASSWORD=postgres
+    networks:
+      - frontend
+      - backend
+    depends_on:
+      - postgis
+
+networks:
+  frontend:
+  backend:   
