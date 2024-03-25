@@ -9,7 +9,7 @@ services:
     environment:
       - POSTGRES_USER=postgres
       - POSTGRES_PASSWORD=postgres
-      - POSTGRES_DB=public
+      - POSTGRES_DB=postgres
     networks:
       - backend
   
@@ -20,8 +20,8 @@ services:
     ports:
       - "8001:80"
     environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: 1234
+      - PGADMIN_DEFAULT_EMAIL=admin@admin.com
+      - PGADMIN_DEFAULT_PASSWORD=1234
     networks:
       - frontend
       - backend
@@ -39,7 +39,7 @@ services:
     volumes:
       - ./:/watershed-app
     environment:
-      - aw_dbname=public
+      - aw_dbname=postgres
       - aw_host=postgis
       - aw_port=5432
       - aw_user=postgres
