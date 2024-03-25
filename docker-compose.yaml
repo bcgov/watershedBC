@@ -1,7 +1,7 @@
 services:
   postgis:
-    image: postgis/postgis:alpine
-    restart: always
+    image: postgis/postgis
+    restart: on-failure
     ports:
       - 5432:5432
     volumes:
@@ -16,7 +16,7 @@ services:
   pgadmin:
     image: dpage/pgadmin4
     container_name: pgadmin4
-    restart: always
+    restart: on-failure
     ports:
       - "8001:80"
     environment:
@@ -30,7 +30,7 @@ services:
 
   watershedbc:
     image: watershedbc
-    restart: always
+    restart: on-failure
     build:
       context: .
       dockerfile: Dockerfile
@@ -39,11 +39,11 @@ services:
     volumes:
       - ./:/watershed-app
     environment:
-      - AW_DBNAME=public
-      - AW_HOST=postgis
-      - AW_PORT=5432
-      - AW_USER=postgres
-      - AW_PASSWORD=postgres
+      - aw_dbname=public
+      - aw_host=postgis
+      - aw_port=5432
+      - aw_user=postgres
+      - aw_password=postgres
     networks:
       - frontend
       - backend
