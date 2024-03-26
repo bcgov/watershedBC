@@ -6,7 +6,7 @@
   conn <- pool::dbPool(
     drv = RPostgres::dbDriver("PostgreSQL"),
     dbname = Sys.getenv("aw_dbname", "postgres"),
-    host = Sys.getenv("aw_host", "postgres"),
+    host = Sys.getenv("aw_host", "0.0.0.0"),
     port = Sys.getenv("aw_port", "5432"),
     user = Sys.getenv("aw_user", "postgres"),
     password = Sys.getenv("aw_password", "postgres")
