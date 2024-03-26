@@ -17,8 +17,8 @@ echo "LOADING TEST DATA..."
 psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --file /tmp/sql/public_load_data.sql
 echo "DONE"
 
-# echo ""
-# echo "PUBLIC USER CREATION..."
-# psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --file /tmp/sql/public_users.sql
-# echo "DONE"
+echo ""
+echo "PUBLIC USER CREATION..."
+psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" --dbname "$POSTGRES_DB" --file /tmp/sql/public_users.sql
+echo "DONE"
 echo ""

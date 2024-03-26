@@ -39,4 +39,3 @@ CREATE ROLE shiny WITH
   NOBYPASSRLS;
 
 -- GRANT readaccess TO shiny;
-
