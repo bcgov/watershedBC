@@ -1,0 +1,101 @@
+"row.names","date_time","session_token","gnis_name","gnis_id","processing_time","action","area_km2","basin_source"
+"FALSE","2023-12-14 16:26:58.108084","bob","","","","start",NULL,NULL
+"FALSE","2023-12-14 16:27:26.757222","f54acffeb74a01c8c8c53530f9579d04","","","","start",NULL,NULL
+"1","2023-12-14 16:27:26.757222","f54acffeb74a01c8c8c53530f9579d04","Entiako River","17843","2.21 sec elapsed","select watershed",NULL,NULL
+"FALSE","2023-12-14 16:30:08.09123","session$token","","","","start",NULL,NULL
+"1","2023-12-14 16:30:08.09123","session$token","Amanita Creek","9971","237.32 sec elapsed","processing",NULL,NULL
+"FALSE","2023-12-14 16:35:16.062797","de2d17d5b6a81de690a3a19146d8fdcd","","","","start",NULL,NULL
+"1","2023-12-14 16:35:16.062797","de2d17d5b6a81de690a3a19146d8fdcd","Hornway Creek","26151","1.89 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 16:35:16.062797","de2d17d5b6a81de690a3a19146d8fdcd","Hornway Creek","26151","47.15 sec elapsed","processing",NULL,NULL
+"FALSE","2023-12-14 16:41:47.742999","a2588fffdb2738cfde9ad7ca74ef93a7","","","","start",NULL,NULL
+"FALSE","2023-12-14 16:45:28.116851","2362c34eef63e6776ced3dc572365766","","","","start",NULL,NULL
+"1","2023-12-14 16:45:28.116851","2362c34eef63e6776ced3dc572365766","Wrede Creek","32042","1.8 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 16:45:28.116851","2362c34eef63e6776ced3dc572365766","Cutbank Creek","20330","1.69 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 16:57:29.218351","b7196503231584cea57ec541bf1760e6","Discovery Creek","23695","1.78 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 01:00:24.21466","4c9c9e056d596ff0197603c67a79dedf","Hyman Creek","22359","0.691 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 01:00:24.21466","4c9c9e056d596ff0197603c67a79dedf","Hyman Creek","22359","13.937 sec elapsed","processing",NULL,NULL
+"1","2023-12-15 01:08:04.640995","baa91becd1e43e9d079cdc522d3fd13d","150 Yard Creek","7513","0.132 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 01:09:25.479872","b72745d62db6a6c07c12e6867829b580","Salmon River","20525","0.294 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 01:09:25.479872","b72745d62db6a6c07c12e6867829b580","Salmon River","20525","135.69 sec elapsed","processing",NULL,NULL
+"1","2023-12-15 01:19:04.242141","23806b66a86a58683d578ad8723a73a6","Bowron River","9100","0.251 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 01:19:04.242141","23806b66a86a58683d578ad8723a73a6","Bowron River","9100","75.988 sec elapsed","processing",NULL,NULL
+"1","2023-12-15 01:26:38.133974","8e6e06ae03a4f9f805929494b661db59","Nazko River","16592","0.308 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 01:26:38.133974","8e6e06ae03a4f9f805929494b661db59","Nazko River","16592","88.666 sec elapsed","processing",NULL,NULL
+"1","2023-12-15 01:30:42.750852","3e9abe72f27442a3ac3eea4d1fa29a3b","Slim Creek","27946","0.163 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 01:30:42.750852","3e9abe72f27442a3ac3eea4d1fa29a3b","Slim Creek","27946","14.075 sec elapsed","processing",NULL,NULL
+"1","2023-12-15 01:30:42.750852","3e9abe72f27442a3ac3eea4d1fa29a3b","Slim Creek","27946","12.662 sec elapsed","processing",NULL,NULL
+"1","2023-12-15 01:30:42.750852","3e9abe72f27442a3ac3eea4d1fa29a3b","Missinka River","29606","0.306 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 01:30:42.750852","3e9abe72f27442a3ac3eea4d1fa29a3b","Missinka River","29606","12.451 sec elapsed","processing",NULL,NULL
+"1","2023-12-15 02:00:31.289639","b18df03b3a1cb025f8b48c73045853ba","Penticton Creek","14718","0.219 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 02:00:31.289639","b18df03b3a1cb025f8b48c73045853ba","Penticton Creek","14718","11.969 sec elapsed","processing",NULL,NULL
+"1","2023-12-15 02:00:31.289639","b18df03b3a1cb025f8b48c73045853ba","Carnation Creek","18410","0.162 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 02:00:31.289639","b18df03b3a1cb025f8b48c73045853ba","Carnation Creek","18410","0.146 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 02:00:31.289639","b18df03b3a1cb025f8b48c73045853ba","Carnation Creek","18410","6.679 sec elapsed","processing",NULL,NULL
+"1","2023-12-15 02:59:32.220595","c25c7bb0ba66652f324b4bcb07a8b6a6","Dease River","16080","0.273 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 03:39:22.308654","7b4929aba61774f9e78d08b92dd157c4","Forgetmenot Creek","11798","0.176 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 03:39:22.308654","7b4929aba61774f9e78d08b92dd157c4","Forgetmenot Creek","11798","16.295 sec elapsed","processing",NULL,NULL
+"1","2023-12-15 03:51:33.895763","71de30d1992be1132dec6188a5f5241c","Table River","23125","0.234 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 03:51:33.895763","71de30d1992be1132dec6188a5f5241c","Table River","23125","18.075 sec elapsed","processing",NULL,NULL
+"1","2023-12-15 03:51:33.895763","71de30d1992be1132dec6188a5f5241c","Table River","23125","0.36 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 03:51:33.895763","71de30d1992be1132dec6188a5f5241c","Hominka River","23806","0.322 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 03:51:33.895763","71de30d1992be1132dec6188a5f5241c","Missinka River","29606","0.309 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 03:51:33.895763","71de30d1992be1132dec6188a5f5241c","Parsnip River","8127","0.31 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 03:51:33.895763","71de30d1992be1132dec6188a5f5241c","Spakwaniko Creek","26547","0.376 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 04:49:34.432764","183bf27336264fbef1cc4c6a690fa832","Dean River","16075","0.297 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 04:49:34.432764","183bf27336264fbef1cc4c6a690fa832","Dean River","16075","225.056 sec elapsed","processing",NULL,NULL
+"1","2023-12-14 21:44:26.904141","7f6dd092939ce0848bd0ed0a3a3dc2b9","Salmon River","20525","0.85 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 21:44:26.904141","7f6dd092939ce0848bd0ed0a3a3dc2b9","Salmon River","20525","154.25 sec elapsed","processing",NULL,NULL
+"1","2023-12-14 21:53:47.232769","cbb0d4dc0d05ff9014ff8ecc3accc8a7","Redmountain Creek","28870","0.61 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 22:05:35.050883","f2aee948397b2dc860b3a25d31710dac","Salmon River","20525","0.85 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 22:23:28.231879","a5cffedf68750e323f74726a52ad4c03","117 Mile Creek","39416","0.64 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 22:27:41.850906","192056663e939cda78a0dd89eb00b07b","Bowron River","9100","0.84 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 22:34:21.330593","82042dab8162fbdec40ca261d9e85167","Chappelle Creek","15570","1.12 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 22:43:55.262274","0e8926e822c497e5513c7a7c99335590","Nation River","7893","1.12 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 22:51:08.409489","a6b2ef51bc2c5b65e64a7b2889311876","Amanita Creek","9971","0.61 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 22:51:08.409489","a6b2ef51bc2c5b65e64a7b2889311876","Amanita Creek","9971","0.247666666666667 minutes elapsed","processing",NULL,NULL
+"1","2023-12-14 22:51:08.409489","a6b2ef51bc2c5b65e64a7b2889311876","Parsnip River","8127","0.96 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 22:51:08.409489","a6b2ef51bc2c5b65e64a7b2889311876","Parsnip River","8127","2.68533333333333 minutes elapsed","processing",NULL,NULL
+"1","2023-12-14 22:58:03.567596","5cfa030bda443801ba5ffd2c802a2432","Elk River","16880","1.15 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 22:58:03.567596","5cfa030bda443801ba5ffd2c802a2432","Elk River","16880","2.7 minutes elapsed","processing",NULL,NULL
+"1","2023-12-14 23:04:53.082885","dd1e39f0539268b129a07d2481bad83a","Kastberg Creek","15700","1.22 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:04:53.082885","dd1e39f0539268b129a07d2481bad83a","Omineca River","8264","1.04 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:04:53.082885","dd1e39f0539268b129a07d2481bad83a","Aaltanhash River","3988","0.66 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:04:53.082885","dd1e39f0539268b129a07d2481bad83a","Omineca River","8264","0.94 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:19:54.794995","e6754a20b3e861e1a13f65435930a11e","Osilinka River","24882","1.11 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:22:25.924814","19af75cbcc937146785aa78e02b884d1","Middle River","28983","1.27 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:22:53.098943","3a0fa763615be41f7ec1263647335613","test","test","1.68 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:22:53.098943","3a0fa763615be41f7ec1263647335613","test","test","1.6 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:23:29.126085","647f429c2b918c4a989e0c454c2ece6c","Dean River","16075","0.89 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:23:29.126085","647f429c2b918c4a989e0c454c2ece6c","test","test","1.53 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:23:29.126085","647f429c2b918c4a989e0c454c2ece6c","test","test","1.5 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:23:29.126085","647f429c2b918c4a989e0c454c2ece6c","test","test","1.51 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:26:34.136406","38b3854216d5f34a9285858dd16523b7","test","test","0.79 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:26:34.136406","38b3854216d5f34a9285858dd16523b7","test","test","0.55 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:26:34.136406","38b3854216d5f34a9285858dd16523b7","test","test","0.58 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:26:34.136406","38b3854216d5f34a9285858dd16523b7","test","test","0.61 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:26:34.136406","38b3854216d5f34a9285858dd16523b7","test","test","0.72 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:26:34.136406","38b3854216d5f34a9285858dd16523b7","test","test","0.87 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:26:34.136406","38b3854216d5f34a9285858dd16523b7","test","test","2.03 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:30:25.367429","87cd7aeffcad58eed8f109400616bfbb","Pelly Creek","20944","1.05 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:31:27.964004","19c0f5eae4837aca07b1e397b4626a9f","Skeena River","2936","1.11 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:34:29.712557","b4cc96779afd532c26c1f9b454e29439","Twist Creek","35655","0.95 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:34:29.712557","b4cc96779afd532c26c1f9b454e29439","test","test","1.25 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-14 23:36:52.558132","7bb60bc8add0f44a87768b17b0af1504","Klinaklini River","3273","0.86 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 15:20:18.853463","ce976b9fe6f0fa47492fbe793033daf7","Bowron River","9100","0.255 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 15:20:18.853463","ce976b9fe6f0fa47492fbe793033daf7","Bowron River","9100","1.4 minutes elapsed","processing",NULL,NULL
+"1","2023-12-15 15:20:18.853463","ce976b9fe6f0fa47492fbe793033daf7","Cariboo River","37911","0.361 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 15:20:18.853463","ce976b9fe6f0fa47492fbe793033daf7","Carnation Creek","18410","0.146 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 15:20:18.853463","ce976b9fe6f0fa47492fbe793033daf7","Carnation Creek","18410","0.1 minutes elapsed","processing",NULL,NULL
+"1","2023-12-15 15:20:18.853463","ce976b9fe6f0fa47492fbe793033daf7","Hungary Creek","22282","0.147 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 15:20:18.853463","ce976b9fe6f0fa47492fbe793033daf7","Hungary Creek","22282","0.149 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 15:20:18.853463","ce976b9fe6f0fa47492fbe793033daf7","Hungary Creek","22282","0.1 minutes elapsed","processing",NULL,NULL
+"1","2023-12-15 15:20:18.853463","ce976b9fe6f0fa47492fbe793033daf7","Hungary Creek","22282","0.311 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 15:20:18.853463","ce976b9fe6f0fa47492fbe793033daf7","Driscoll Creek","22161","0.274 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 15:20:18.853463","ce976b9fe6f0fa47492fbe793033daf7","Hungary Creek","22282","0.146 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 15:34:47.840223","e1fee3cb72edc7ba9f508755a3e8f6cb","Koosawu.áa Héen","23205","0.291 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 15:34:47.840223","e1fee3cb72edc7ba9f508755a3e8f6cb","Koosawu.áa Héen","23205","0.3 minutes elapsed","processing",NULL,NULL
+"1","2023-12-15 15:51:23.199453","61bef155e79700ae12b388162ae35708","Chilako River","13734","0.408 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 16:26:28.703037","1fe037aafb856c6f60f14f8695435f66","Mesilinka River","8540","0.383 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 16:26:28.703037","1fe037aafb856c6f60f14f8695435f66","Mesilinka River","8540","0.9 minutes elapsed","processing",NULL,NULL
+"1","2023-12-15 16:35:11.090358","b5c0d08778e1c53bfd429c7da8d8f07c","Youngs Creek","30456","0.42 sec elapsed","select watershed",NULL,NULL
+"1","2023-12-15 16:35:11.090358","b5c0d08778e1c53bfd429c7da8d8f07c","Youngs Creek","30456","0.2 minutes elapsed","processing",NULL,NULL
