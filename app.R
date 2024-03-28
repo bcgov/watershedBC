@@ -1509,7 +1509,9 @@ server <- function(input, output, session) {
   })
 }
 
-shinyApp(ui, server)
+# Option to fix port on 3838. This is strickly for local development and does not effect deployments
+# Do not remove this option
+shinyApp(ui, server, options = list(port = 3838))
 
 # lapply(DBI::dbListConnections(RPostgres::dbDriver("PostgreSQL")), function(i){
 #   print(i)
