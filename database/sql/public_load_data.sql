@@ -91,3 +91,7 @@ DELIMITER ',' CSV null 'NULL' HEADER;
 COPY public.wsc_stationloc
 from '/tmp/data/wsc_stationloc.csv'
 DELIMITER ',' CSV null 'NULL' HEADER;
+
+COPY public.watershed_statistics
+from '/tmp/data/watershed_statistics.csv'
+DELIMITER ',' CSV null 'NULL' HEADER;
