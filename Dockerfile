@@ -1,14 +1,12 @@
-# rocker rshiny image: https://rocker-project.org/images/versioned/shiny.html
-# This image is quite large with dependencies ~2.30GB might look for alternatives.
-# in the future. rocker/shiny is most used shiny image
-FROM rocker/shiny AS base
+FROM rocker/r-ver:4.3.3 AS base
 
 # dependencies needed for RPostgreSQL and sf
 RUN apt-get update && apt-get install -y \
     libpq-dev \
     libudunits2-dev \
     libproj-dev \
-    libgdal-dev
+    libgdal-dev \
+    libgeos-dev
 
 FROM base
 
@@ -51,5 +49,5 @@ COPY . .
 # Exposing default rshiny port
 EXPOSE 3838
 
-# Running the app
-CMD [ "Rscript", "app.R" ]
+# Running the app using R Shiny
+CMD ["R", "-e", "shiny::runApp('app.R', host='0.0.0.0', port=3838, launch.browser=FALSE)"]

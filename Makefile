@@ -49,5 +49,5 @@ kill: ## 	Kills and removes all services
 stop: ## 	Stops all running services
 	@docker compose stop
 
-prune: ## 	Docker system prune
+prune: kill ## 	Docker system prune
 	@docker system prune --volumes --force
